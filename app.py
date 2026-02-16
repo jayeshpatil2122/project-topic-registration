@@ -19,17 +19,18 @@ if database_url:
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///groups.db'
 
-db = SQLAlchemy(app)
-with app.app_context():
-    db.create_all()
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+db = SQLAlchemy(app)
 
 ADMIN_PASSWORD = "2122"
 
 # ===============================
-# MODEL
+# MODEL (FIXED TABLE NAME)
 # ===============================
 class Group(db.Model):
+    __tablename__ = "groups"   # ✅ IMPORTANT FIX
+
     id = db.Column(db.Integer, primary_key=True)
     topic = db.Column(db.String(200), unique=True)
 
@@ -44,6 +45,14 @@ class Group(db.Model):
 
     m4_name = db.Column(db.String(100))
     m4_prn = db.Column(db.String(100))
+
+
+# ===============================
+# CREATE TABLES AFTER MODEL
+# ===============================
+with app.app_context():
+    db.create_all()
+
 
 # ===============================
 # HELPER FUNCTIONS
@@ -69,6 +78,7 @@ def topics_similar(topic1, topic2):
     similarity_ratio = len(common) / min(len(words1), len(words2))
     return similarity_ratio >= 0.7
 
+
 # ===============================
 # STUDENT PAGE
 # ===============================
@@ -85,11 +95,9 @@ def index():
 
         topic = request.form['topic'].strip()
 
-        # ===============================
-        # CHECK TOPIC DUPLICATE
-        # ===============================
         existing_groups = Group.query.all()
 
+        # 🔎 CHECK DUPLICATE TOPIC
         for g in existing_groups:
             if topics_similar(topic, g.topic):
                 popup = "duplicate_topic"
@@ -99,9 +107,7 @@ def index():
                                        popup=popup,
                                        message=message)
 
-        # ===============================
-        # CHECK MEMBER DUPLICATE
-        # ===============================
+        # 🔎 CHECK DUPLICATE MEMBERS
         members = []
 
         for i in range(1, 5):
@@ -110,18 +116,14 @@ def index():
             members.append((name, prn))
 
         for g in existing_groups:
-            for name, prn in members:
+            existing_names = [g.m1_name, g.m2_name, g.m3_name, g.m4_name]
+            existing_prns = [g.m1_prn, g.m2_prn, g.m3_prn, g.m4_prn]
 
-                existing_names = [
-                    g.m1_name, g.m2_name, g.m3_name, g.m4_name
-                ]
-                existing_prns = [
-                    g.m1_prn, g.m2_prn, g.m3_prn, g.m4_prn
-                ]
+            for name, prn in members:
 
                 if clean_text(prn) in [clean_text(p) for p in existing_prns]:
                     popup = "duplicate_user"
-                    message = f"User with PRN {prn} is already in Group #{g.id}"
+                    message = f"PRN {prn} already in Group #{g.id}"
                     return render_template('index.html',
                                            groups=existing_groups,
                                            popup=popup,
@@ -129,15 +131,13 @@ def index():
 
                 if clean_text(name) in [clean_text(n) for n in existing_names]:
                     popup = "duplicate_user"
-                    message = f"{name} is already in Group #{g.id}"
+                    message = f"{name} already in Group #{g.id}"
                     return render_template('index.html',
                                            groups=existing_groups,
                                            popup=popup,
                                            message=message)
 
-        # ===============================
-        # SAVE GROUP
-        # ===============================
+        # 💾 SAVE
         new_group = Group(
             topic=topic,
             m1_name=members[0][0], m1_prn=members[0][1],
@@ -154,6 +154,7 @@ def index():
     groups = Group.query.all()
     return render_template('index.html', groups=groups)
 
+
 # ===============================
 # ADMIN LOGIN
 # ===============================
@@ -168,8 +169,9 @@ def admin():
 
     return render_template('admin_login.html')
 
+
 # ===============================
-# EDIT GROUP (ADMIN)
+# EDIT GROUP
 # ===============================
 @app.route('/edit/<int:group_id>', methods=['GET', 'POST'])
 def edit_group(group_id):
@@ -177,30 +179,24 @@ def edit_group(group_id):
     group = Group.query.get_or_404(group_id)
 
     if request.method == 'POST':
-
         group.topic = request.form['topic']
-
         group.m1_name = request.form['m1_name']
         group.m1_prn = request.form['m1_prn']
-
         group.m2_name = request.form['m2_name']
         group.m2_prn = request.form['m2_prn']
-
         group.m3_name = request.form['m3_name']
         group.m3_prn = request.form['m3_prn']
-
         group.m4_name = request.form['m4_name']
         group.m4_prn = request.form['m4_prn']
 
         db.session.commit()
-
         return redirect('/admin')
 
     return render_template('edit_group.html', group=group)
 
 
 # ===============================
-# FILE DOWNLOADS
+# DOWNLOAD EXCEL
 # ===============================
 @app.route('/download_excel')
 def download_excel():
@@ -222,13 +218,16 @@ def download_excel():
 
     return send_file(file_path, as_attachment=True)
 
+
+# ===============================
+# DOWNLOAD PDF
+# ===============================
 @app.route('/download_pdf')
 def download_pdf():
     file_path = "groups.pdf"
     doc = SimpleDocTemplate(file_path, pagesize=A4)
 
     groups = Group.query.all()
-
     data = [["Topic","Member 1","Member 2","Member 3","Member 4"]]
 
     for g in groups:
@@ -249,6 +248,6 @@ def download_pdf():
     doc.build([table])
     return send_file(file_path, as_attachment=True)
 
+
 if __name__ == "__main__":
     app.run(debug=True)
-
