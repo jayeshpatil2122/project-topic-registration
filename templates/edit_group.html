@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Group</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="p-4 bg-light">
+
+<div class="container">
+
+<h3 class="mb-4">Edit Group #{{ group.id }}</h3>
+
+<div class="card p-4 shadow">
+
+<form method="POST">
+
+<h5>Topic</h5>
+<input type="text" name="topic" class="form-control mb-3"
+       value="{{ group.topic }}" required>
+
+<h6>Member 1</h6>
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" name="m1_name" class="form-control"
+               value="{{ group.m1_name }}" required>
+    </div>
+    <div class="col-md-6">
+        <input type="text" name="m1_prn" class="form-control"
+               value="{{ group.m1_prn }}" required>
+    </div>
+</div>
+
+<h6>Member 2</h6>
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" name="m2_name" class="form-control"
+               value="{{ group.m2_name }}" required>
+    </div>
+    <div class="col-md-6">
+        <input type="text" name="m2_prn" class="form-control"
+               value="{{ group.m2_prn }}" required>
+    </div>
+</div>
+
+<h6>Member 3</h6>
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" name="m3_name" class="form-control"
+               value="{{ group.m3_name }}" required>
+    </div>
+    <div class="col-md-6">
+        <input type="text" name="m3_prn" class="form-control"
+               value="{{ group.m3_prn }}" required>
+    </div>
+</div>
+
+<h6>Member 4</h6>
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" name="m4_name" class="form-control"
+               value="{{ group.m4_name }}" required>
+    </div>
+    <div class="col-md-6">
+        <input type="text" name="m4_prn" class="form-control"
+               value="{{ group.m4_prn }}" required>
+    </div>
+</div>
+
+<button type="submit" class="btn btn-success w-100">
+    Update Group
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</body>
+</html>
