@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel</title>
+</head>
+<body>
+
+<h2>Admin Panel</h2>
+
+<a href="/download_excel">Download Excel</a>
+<br><br>
+<a href="/download_pdf">Download PDF</a>
+
+<hr>
+
+<h3>All Groups</h3>
+
+<ul>
+{% for g in groups %}
+    <li>{{ g.topic }}</li>
+{% endfor %}
+</ul>
+
+</body>
+</html>
