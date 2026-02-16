@@ -20,6 +20,9 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///groups.db'
 
 db = SQLAlchemy(app)
+with app.app_context():
+    db.create_all()
+
 
 ADMIN_PASSWORD = "2122"
 
@@ -247,6 +250,5 @@ def download_pdf():
     return send_file(file_path, as_attachment=True)
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
     app.run(debug=True)
+
