@@ -21,13 +21,10 @@ if database_url:
         database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print("Using PostgreSQL database")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///groups.db'
-    print("Using SQLite database")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
 
 ADMIN_PASSWORD = "2122"
@@ -54,32 +51,34 @@ class Group(db.Model):
     m4_prn = db.Column(db.String(100))
 
 
-# Create tables
 with app.app_context():
     db.create_all()
-
 
 # ===============================
 # HELPER FUNCTIONS
 # ===============================
 def clean_text(text):
+    if not text:
+        return ""
     return re.sub(r'\s+', '', text.lower())
 
 def clean_words(text):
+    if not text:
+        return set()
     text = text.lower()
     text = re.sub(r'[^a-z\s]', '', text)
     return set(text.split())
 
-def topics_similar(topic1, topic2):
-    words1 = clean_words(topic1)
-    words2 = clean_words(topic2)
+def topics_similar(t1, t2):
+    w1 = clean_words(t1)
+    w2 = clean_words(t2)
 
-    if not words1 or not words2:
+    if not w1 or not w2:
         return False
 
-    common = words1.intersection(words2)
-    similarity_ratio = len(common) / min(len(words1), len(words2))
-    return similarity_ratio >= 0.7
+    common = w1.intersection(w2)
+    similarity = len(common) / min(len(w1), len(w2))
+    return similarity >= 0.7
 
 
 # ===============================
@@ -91,54 +90,52 @@ def index():
     popup = None
     message = None
 
-    existing_groups = Group.query.all()
-
     if request.method == 'POST':
 
         if Group.query.count() >= 26:
             return "🚫 Maximum 26 Groups Allowed."
 
         topic = request.form['topic'].strip()
+        existing_groups = Group.query.all()
 
-        # 🔎 CHECK DUPLICATE TOPIC
+        # ---- CHECK DUPLICATE TOPIC ----
         for g in existing_groups:
             if topics_similar(topic, g.topic):
                 popup = "duplicate_topic"
                 message = f"Topic already selected by Group #{g.id}"
-                return render_template(
-                    'index.html',
-                    groups=existing_groups,
-                    popup=popup,
-                    message=message
-                )
+                return render_template('index.html',
+                                       groups=existing_groups,
+                                       popup=popup,
+                                       message=message)
 
-        # ===============================
-        # COLLECT MEMBERS
-        # ===============================
+        # ---- COLLECT MEMBERS (ONLY FILLED ONES) ----
         members = []
-
         for i in range(1, 5):
-            name = request.form[f'm{i}_name'].strip()
-            prn = request.form[f'm{i}_prn'].strip()
-            members.append((name, prn))
+            name = request.form.get(f'm{i}_name', '').strip()
+            prn = request.form.get(f'm{i}_prn', '').strip()
 
-        # ===============================
-        # PRN VALIDATION (12 digits)
-        # ===============================
+            if name and prn:
+                members.append((name, prn))
+
+        if len(members) == 0:
+            popup = "invalid_group"
+            message = "At least 1 member required"
+            return render_template('index.html',
+                                   groups=existing_groups,
+                                   popup=popup,
+                                   message=message)
+
+        # ---- PRN VALIDATION ----
         for name, prn in members:
             if not prn.isdigit() or len(prn) != 12:
                 popup = "invalid_prn"
                 message = f"PRN {prn} must be exactly 12 digits"
-                return render_template(
-                    'index.html',
-                    groups=existing_groups,
-                    popup=popup,
-                    message=message
-                )
+                return render_template('index.html',
+                                       groups=existing_groups,
+                                       popup=popup,
+                                       message=message)
 
-        # ===============================
-        # CHECK MEMBER DUPLICATE
-        # ===============================
+        # ---- CHECK DUPLICATE MEMBERS ----
         for g in existing_groups:
 
             existing_names = [g.m1_name, g.m2_name, g.m3_name, g.m4_name]
@@ -146,47 +143,45 @@ def index():
 
             for name, prn in members:
 
-                if clean_text(prn) in [clean_text(p) for p in existing_prns]:
+                if clean_text(prn) in [clean_text(p) for p in existing_prns if p]:
                     popup = "duplicate_user"
                     message = f"PRN {prn} already in Group #{g.id}"
-                    return render_template(
-                        'index.html',
-                        groups=existing_groups,
-                        popup=popup,
-                        message=message
-                    )
+                    return render_template('index.html',
+                                           groups=existing_groups,
+                                           popup=popup,
+                                           message=message)
 
-                if clean_text(name) in [clean_text(n) for n in existing_names]:
+                if clean_text(name) in [clean_text(n) for n in existing_names if n]:
                     popup = "duplicate_user"
                     message = f"{name} already in Group #{g.id}"
-                    return render_template(
-                        'index.html',
-                        groups=existing_groups,
-                        popup=popup,
-                        message=message
-                    )
+                    return render_template('index.html',
+                                           groups=existing_groups,
+                                           popup=popup,
+                                           message=message)
 
-        # ===============================
-        # SAVE GROUP
-        # ===============================
-        new_group = Group(
-            topic=topic,
-            m1_name=members[0][0], m1_prn=members[0][1],
-            m2_name=members[1][0], m2_prn=members[1][1],
-            m3_name=members[2][0], m3_prn=members[2][1],
-            m4_name=members[3][0], m4_prn=members[3][1],
-        )
+        # ---- SAVE (DYNAMIC MEMBERS) ----
+        new_group = Group(topic=topic)
+
+        if len(members) >= 1:
+            new_group.m1_name, new_group.m1_prn = members[0]
+        if len(members) >= 2:
+            new_group.m2_name, new_group.m2_prn = members[1]
+        if len(members) >= 3:
+            new_group.m3_name, new_group.m3_prn = members[2]
+        if len(members) >= 4:
+            new_group.m4_name, new_group.m4_prn = members[3]
 
         db.session.add(new_group)
         db.session.commit()
 
         return redirect('/')
 
-    return render_template('index.html', groups=existing_groups)
+    groups = Group.query.all()
+    return render_template('index.html', groups=groups)
 
 
 # ===============================
-# ADMIN LOGIN
+# ADMIN PANEL
 # ===============================
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
@@ -195,47 +190,20 @@ def admin():
             groups = Group.query.all()
             return render_template('admin.html', groups=groups)
         else:
-            return render_template('admin_login.html', error="Wrong Password!")
+            return "Wrong Password"
 
     return render_template('admin_login.html')
 
 
 # ===============================
-# EDIT GROUP
+# DELETE GROUP
 # ===============================
-@app.route('/edit/<int:group_id>', methods=['GET', 'POST'])
-def edit_group(group_id):
-
-    group = Group.query.get_or_404(group_id)
-
-    if request.method == 'POST':
-        group.topic = request.form['topic']
-        group.m1_name = request.form['m1_name']
-        group.m1_prn = request.form['m1_prn']
-        group.m2_name = request.form['m2_name']
-        group.m2_prn = request.form['m2_prn']
-        group.m3_name = request.form['m3_name']
-        group.m3_prn = request.form['m3_prn']
-        group.m4_name = request.form['m4_name']
-        group.m4_prn = request.form['m4_prn']
-
-        db.session.commit()
-        return redirect('/admin')
-
-    return render_template('edit_group.html', group=group)
-# ===============================
-# DELETE GROUP (ADMIN)
-# ===============================
-@app.route('/delete/<int:group_id>', methods=['POST'])
+@app.route('/delete/<int:group_id>')
 def delete_group(group_id):
-
     group = Group.query.get_or_404(group_id)
-
     db.session.delete(group)
     db.session.commit()
-
     return redirect('/admin')
-
 
 
 # ===============================
@@ -249,10 +217,10 @@ def download_excel():
     for g in groups:
         data.append([
             g.topic,
-            f"{g.m1_name} ({g.m1_prn})",
-            f"{g.m2_name} ({g.m2_prn})",
-            f"{g.m3_name} ({g.m3_prn})",
-            f"{g.m4_name} ({g.m4_prn})"
+            f"{g.m1_name or ''} ({g.m1_prn or ''})",
+            f"{g.m2_name or ''} ({g.m2_prn or ''})",
+            f"{g.m3_name or ''} ({g.m3_prn or ''})",
+            f"{g.m4_name or ''} ({g.m4_prn or ''})"
         ])
 
     df = pd.DataFrame(data, columns=["Topic","Member 1","Member 2","Member 3","Member 4"])
@@ -263,34 +231,7 @@ def download_excel():
 
 
 # ===============================
-# DOWNLOAD PDF
+# RUN
 # ===============================
-@app.route('/download_pdf')
-def download_pdf():
-    file_path = "groups.pdf"
-    doc = SimpleDocTemplate(file_path, pagesize=A4)
-
-    groups = Group.query.all()
-    data = [["Topic","Member 1","Member 2","Member 3","Member 4"]]
-
-    for g in groups:
-        data.append([
-            g.topic,
-            f"{g.m1_name} ({g.m1_prn})",
-            f"{g.m2_name} ({g.m2_prn})",
-            f"{g.m3_name} ({g.m3_prn})",
-            f"{g.m4_name} ({g.m4_prn})"
-        ])
-
-    table = Table(data)
-    table.setStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.grey),
-        ('GRID',(0,0),(-1,-1),1,colors.black)
-    ])
-
-    doc.build([table])
-    return send_file(file_path, as_attachment=True)
-
-
 if __name__ == "__main__":
     app.run()

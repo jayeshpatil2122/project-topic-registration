@@ -52,7 +52,6 @@ body {
     padding: 18px;
     margin-bottom: 25px;
     color: #000;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
 }
 
 .timer-section {
@@ -65,20 +64,33 @@ body {
     color: white;
 }
 
-.topic-text { font-size: var(--topic-size); }
-
-.member-list {
-    line-height: 1.4;
-    font-size: var(--member-size);
-    color: #333;
+/* NEW MEMBER BUTTON STYLE */
+.member-select-wrapper {
+    text-align: center;
+    margin-bottom: 20px;
 }
 
-.member-name { font-weight: 500; }
+.member-btn {
+    border: none;
+    padding: 10px 18px;
+    margin: 6px;
+    border-radius: 30px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    transition: all 0.3s ease;
+}
 
-.member-prn {
-    font-size: 10px;
-    color: #666;
-    margin-bottom: 6px;
+.member-btn:hover {
+    transform: translateY(-3px);
+}
+
+.member-btn.active {
+    background: linear-gradient(135deg, #ff512f, #dd2476);
+}
+
+.member-section {
+    margin-bottom: 10px;
 }
 
 .footer {
@@ -88,46 +100,34 @@ body {
     opacity: 0.7;
     color: #000;
 }
-
-table th, table td { vertical-align: middle !important; }
 </style>
 
 <script>
-// Timer
-var deadline = new Date("February 20, 2026 23:59:59").getTime();
+function setMembers(count, btn) {
 
-setInterval(function () {
-    var now = new Date().getTime();
-    var distance = deadline - now;
+    document.querySelectorAll(".member-btn").forEach(b => {
+        b.classList.remove("active");
+    });
 
-    if (distance < 0) {
-        document.getElementById("timer").innerHTML = "FORM CLOSED";
-        return;
+    btn.classList.add("active");
+
+    for (let i = 1; i <= 4; i++) {
+        let section = document.getElementById("member" + i);
+
+        if (i <= count) {
+            section.style.display = "block";
+        } else {
+            section.style.display = "none";
+            section.querySelectorAll("input").forEach(input => {
+                input.value = "";
+            });
+        }
     }
-
-    var days = Math.floor(distance / (1000 * 60 * 60 * 24));
-    var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-    document.getElementById("timer").innerHTML =
-        days + "d : " + hours + "h : " +
-        minutes + "m : " + seconds + "s";
-}, 1000);
-
-// Confirm submit
-function confirmSubmit(event){
-    event.preventDefault();
-    document.getElementById("confirmModal").style.display = "block";
 }
 
-function finalSubmit(){
-    document.getElementById("groupForm").submit();
-}
-
-function closeConfirm(){
-    document.getElementById("confirmModal").style.display = "none";
-}
+window.onload = function() {
+    setMembers(4, document.querySelector(".member-btn"));
+};
 </script>
 
 </head>
@@ -136,56 +136,51 @@ function closeConfirm(){
 
 <div class="container">
 
-<!-- HEADER -->
-<div class="header-box shadow mb-4">
-    <div class="row align-items-center text-center">
-        <div class="col-12 col-md-3 text-md-start mb-2">
-            <img src="{{ url_for('static', filename='images/left_logo.png') }}" width="160">
-        </div>
-        <div class="col-12 col-md-6">
-            <h5 class="fw-bold">Sandip University, Nashik (MS), India</h5>
-            <small>
-                At Post Mahiravani, Trimbak Road, Nashik - 422213, Maharashtra<br>
-                www.sandipuniversity.edu.in
-            </small>
-        </div>
-    </div>
-    <hr>
-    <div class="text-center">
-    <h6>Program: B.Tech CSE | Sem IV <br> Div A</h6>
-    <h6>Subject: Microcontroller & Interfacing</h6>
-    <h6 style="margin-top:5px;">Faculty: Samiksha Gawali Mam</h6>
-</div>
-
-
 <h4 class="text-center mb-3 text-white">Project Topic Registration</h4>
 
-<!-- INSTRUCTIONS -->
 <div class="instructions-box">
     <h6>📌 Instructions</h6>
     <ul>
-        <li>Each group must contain exactly 4 members.</li>
+        <li>You can select 1 to 4 members.</li>
         <li>Duplicate or similar topics are not allowed.</li>
         <li>A student cannot register in more than one group.</li>
     </ul>
 </div>
 
-<!-- FORM -->
 <div class="glass-card mb-4">
-<form method="POST" id="groupForm" onsubmit="confirmSubmit(event)">
+<form method="POST">
 
 <h6>Topic</h6>
 <input type="text" name="topic" class="form-control mb-3" required>
 
+<h6 class="text-center mb-3">Select Number of Members</h6>
+
+<div class="member-select-wrapper">
+    <button type="button" class="member-btn active" onclick="setMembers(4, this)">4 Members</button>
+    <button type="button" class="member-btn" onclick="setMembers(3, this)">3 Members</button>
+    <button type="button" class="member-btn" onclick="setMembers(2, this)">2 Members</button>
+    <button type="button" class="member-btn" onclick="setMembers(1, this)">1 Member</button>
+</div>
+
 {% for i in range(1,5) %}
+<div id="member{{i}}" class="member-section">
 <h6>Member {{i}}</h6>
 <div class="row g-2 mb-3">
     <div class="col-md-6">
-        <input type="text" name="m{{i}}_name" class="form-control" placeholder="Name" required>
+        <input type="text" name="m{{i}}_name" class="form-control" placeholder="Name">
     </div>
     <div class="col-md-6">
-        <input type="text" name="m{{i}}_prn" class="form-control" placeholder="PRN" required>
+        <input type="text"
+               name="m{{i}}_prn"
+               class="form-control"
+               placeholder="PRN"
+               pattern="\d{12}"
+               maxlength="12"
+               minlength="12"
+               inputmode="numeric"
+               title="PRN must be exactly 12 digits">
     </div>
+</div>
 </div>
 {% endfor %}
 
@@ -194,87 +189,6 @@ function closeConfirm(){
 </form>
 </div>
 
-<!-- TIMER -->
-<div class="timer-section mb-4">
-FORM CLOSES IN: <span id="timer"></span>
 </div>
-
-<!-- REGISTERED GROUPS -->
-<div class="glass-card">
-<h5 class="mb-3">Registered Groups ({{ groups|length }}/26)</h5>
-
-<div class="table-responsive">
-<table class="table table-bordered bg-white">
-<thead class="table-light">
-<tr>
-<th style="width:5%">#</th>
-<th style="width:25%">Topic</th>
-<th style="width:70%">Members</th>
-</tr>
-</thead>
-<tbody>
-{% for g in groups %}
-<tr>
-<td>{{ loop.index }}</td>
-<td class="topic-text">{{ g.topic }}</td>
-<td>
-<div class="member-list">
-<div class="member-name">{{ g.m1_name }}</div>
-<div class="member-prn">({{ g.m1_prn }})</div>
-
-<div class="member-name">{{ g.m2_name }}</div>
-<div class="member-prn">({{ g.m2_prn }})</div>
-
-<div class="member-name">{{ g.m3_name }}</div>
-<div class="member-prn">({{ g.m3_prn }})</div>
-
-<div class="member-name">{{ g.m4_name }}</div>
-<div class="member-prn">({{ g.m4_prn }})</div>
-</div>
-</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-</div>
-</div>
-
-<div class="footer">
-<hr>
-<p>Created by Jayesh Patil</p>
-</div>
-
-</div>
-
-<!-- CONFIRM SUBMIT MODAL -->
-<div id="confirmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6);">
-<div style="background:white; width:350px; padding:25px; border-radius:15px; margin:15% auto; text-align:center;">
-<h5>⚠ Confirm Submission</h5>
-<p>Please check all details before submitting.</p>
-<button class="btn btn-success m-2" onclick="finalSubmit()">Yes, Submit</button>
-<button class="btn btn-danger m-2" onclick="closeConfirm()">No</button>
-</div>
-</div>
-
-<!-- ERROR POPUP -->
-{% if popup %}
-<div class="modal fade show" style="display:block; background: rgba(0,0,0,0.6);">
-<div class="modal-dialog modal-dialog-centered">
-<div class="modal-content" style="border-radius:20px;">
-<div class="modal-header bg-danger text-white">
-<h5 class="modal-title">⚠ Registration Error</h5>
-</div>
-<div class="modal-body text-center">
-<p style="font-size:16px; font-weight:500;">{{ message }}</p>
-</div>
-<div class="modal-footer justify-content-center">
-<button class="btn btn-dark px-4"
-onclick="this.closest('.modal').style.display='none'">OK</button>
-</div>
-</div>
-</div>
-</div>
-{% endif %}
-
 </body>
 </html>
