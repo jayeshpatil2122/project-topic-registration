@@ -15,15 +15,19 @@ app = Flask(__name__)
 database_url = os.environ.get("DATABASE_URL")
 
 if database_url:
-    # Use psycopg (v3) driver
-    if database_url.startswith("postgres://"):
-        database_url = database_url.replace("postgres://", "postgresql+psycopg://")
-    else:
-        database_url = database_url.replace("postgresql://", "postgresql+psycopg://")
+    # Use psycopg (v3) driver - Railway provides postgres:// but we need postgresql+psycopg://
+    # Only replace if not already using the correct driver
+    if "postgresql+psycopg://" not in database_url:
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    print(f"Using PostgreSQL database")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///groups.db'
+    print(f"Using SQLite database")
 
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
