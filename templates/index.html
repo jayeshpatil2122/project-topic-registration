@@ -112,6 +112,28 @@ function finalSubmit(){
 function closeConfirm(){
     document.getElementById("confirmModal").style.display="none";
 }
+// TIMER
+var deadline = new Date("February 20, 2026 23:59:59").getTime();
+
+setInterval(function () {
+    var now = new Date().getTime();
+    var distance = deadline - now;
+
+    if (distance < 0) {
+        document.getElementById("timer").innerHTML = "FORM CLOSED";
+        return;
+    }
+
+    var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+    var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+    document.getElementById("timer").innerHTML =
+        days + "d : " + hours + "h : " +
+        minutes + "m : " + seconds + "s";
+}, 1000);
+
 </script>
 
 </head>
@@ -191,6 +213,10 @@ function closeConfirm(){
 
 <button type="submit" class="btn btn-primary w-100">Submit</button>
 </form>
+</div>
+<!-- TIMER -->
+<div class="timer-section mb-4">
+FORM CLOSES IN: <span id="timer"></span>
 </div>
 
 <!-- REGISTERED GROUPS -->
