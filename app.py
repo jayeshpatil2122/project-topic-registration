@@ -274,33 +274,70 @@ def download_excel():
 
 
 # ===============================
-# DOWNLOAD PDF
+# DOWNLOAD PDF (FIXED FORMAT)
 # ===============================
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+
 @app.route('/download_pdf')
 def download_pdf():
+
     file_path = "groups.pdf"
     doc = SimpleDocTemplate(file_path, pagesize=A4)
 
     groups = Group.query.all()
-    data = [["Topic","Member 1","Member 2","Member 3","Member 4"]]
 
-    for g in groups:
-        data.append([
-            g.topic,
-            f"{g.m1_name or ''} ({g.m1_prn or ''})",
-            f"{g.m2_name or ''} ({g.m2_prn or ''})",
-            f"{g.m3_name or ''} ({g.m3_prn or ''})",
-            f"{g.m4_name or ''} ({g.m4_prn or ''})"
-        ])
+    styles = getSampleStyleSheet()
+    normal_style = styles["Normal"]
 
-    table = Table(data)
-    table.setStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.grey),
-        ('GRID',(0,0),(-1,-1),1,colors.black)
+    data = []
+
+    # HEADER ROW
+    data.append([
+        Paragraph("<b>Topic</b>", normal_style),
+        Paragraph("<b>Member 1</b>", normal_style),
+        Paragraph("<b>Member 2</b>", normal_style),
+        Paragraph("<b>Member 3</b>", normal_style),
+        Paragraph("<b>Member 4</b>", normal_style),
     ])
 
+    # FORMAT MEMBER (Name on top, PRN below)
+    def format_member(name, prn):
+        if not name:
+            return ""
+        return Paragraph(f"{name}<br/>{prn}", normal_style)
+
+    # ADD DATA ROWS
+    for g in groups:
+        data.append([
+            Paragraph(g.topic or "", normal_style),
+            format_member(g.m1_name, g.m1_prn),
+            format_member(g.m2_name, g.m2_prn),
+            format_member(g.m3_name, g.m3_prn),
+            format_member(g.m4_name, g.m4_prn),
+        ])
+
+    # FIX COLUMN WIDTHS (IMPORTANT)
+    table = Table(
+        data,
+        colWidths=[1.2*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch]
+    )
+
+    table.setStyle(TableStyle([
+        ('BACKGROUND',(0,0),(-1,0),colors.grey),
+        ('GRID',(0,0),(-1,-1),1,colors.black),
+        ('VALIGN',(0,0),(-1,-1),'TOP'),
+        ('LEFTPADDING',(0,0),(-1,-1),5),
+        ('RIGHTPADDING',(0,0),(-1,-1),5),
+    ]))
+
     doc.build([table])
+
     return send_file(file_path, as_attachment=True)
+
 
 
 if __name__ == "__main__":
