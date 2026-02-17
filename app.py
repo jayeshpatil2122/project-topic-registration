@@ -250,27 +250,40 @@ def delete_group(group_id):
 
 
 # ===============================
-# DOWNLOAD EXCEL
+# DOWNLOAD EXCEL (FIXED VERSION)
 # ===============================
 @app.route('/download_excel')
 def download_excel():
+
     groups = Group.query.all()
+
     data = []
 
     for g in groups:
         data.append([
-            g.topic,
-            f"{g.m1_name or ''} ({g.m1_prn or ''})",
-            f"{g.m2_name or ''} ({g.m2_prn or ''})",
-            f"{g.m3_name or ''} ({g.m3_prn or ''})",
-            f"{g.m4_name or ''} ({g.m4_prn or ''})"
+            g.topic or "",
+            f"{g.m1_name or ''}\n{g.m1_prn or ''}",
+            f"{g.m2_name or ''}\n{g.m2_prn or ''}",
+            f"{g.m3_name or ''}\n{g.m3_prn or ''}",
+            f"{g.m4_name or ''}\n{g.m4_prn or ''}"
         ])
 
-    df = pd.DataFrame(data, columns=["Topic","Member 1","Member 2","Member 3","Member 4"])
-    file_path = "groups.xlsx"
-    df.to_excel(file_path, index=False)
+    df = pd.DataFrame(
+        data,
+        columns=["Topic","Member 1","Member 2","Member 3","Member 4"]
+    )
 
-    return send_file(file_path, as_attachment=True)
+    file_path = "groups.xlsx"
+
+    # IMPORTANT: force openpyxl engine
+    df.to_excel(file_path, index=False, engine="openpyxl")
+
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name="groups.xlsx"
+    )
+
 
 
 # ===============================
