@@ -2,7 +2,6 @@
 <html>
 <head>
     <title>Project Topic Registration</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap -->
@@ -52,6 +51,19 @@ body {
     padding: 18px;
     margin-bottom: 25px;
     color: #000;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+.member-btn {
+    border-radius: 50px;
+    padding: 8px 18px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.member-btn.active {
+    background: linear-gradient(90deg,#667eea,#764ba2);
+    color: white;
 }
 
 .timer-section {
@@ -64,35 +76,6 @@ body {
     color: white;
 }
 
-/* NEW MEMBER BUTTON STYLE */
-.member-select-wrapper {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.member-btn {
-    border: none;
-    padding: 10px 18px;
-    margin: 6px;
-    border-radius: 30px;
-    font-weight: 600;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    transition: all 0.3s ease;
-}
-
-.member-btn:hover {
-    transform: translateY(-3px);
-}
-
-.member-btn.active {
-    background: linear-gradient(135deg, #ff512f, #dd2476);
-}
-
-.member-section {
-    margin-bottom: 10px;
-}
-
 .footer {
     margin-top: 40px;
     text-align: center;
@@ -103,67 +86,89 @@ body {
 </style>
 
 <script>
-function setMembers(count, btn) {
+let memberCount = 4;
 
-    document.querySelectorAll(".member-btn").forEach(b => {
-        b.classList.remove("active");
-    });
+function selectMembers(count){
+    memberCount = count;
 
-    btn.classList.add("active");
-
-    for (let i = 1; i <= 4; i++) {
-        let section = document.getElementById("member" + i);
-
-        if (i <= count) {
-            section.style.display = "block";
-        } else {
-            section.style.display = "none";
-            section.querySelectorAll("input").forEach(input => {
-                input.value = "";
-            });
-        }
+    for(let i=1;i<=4;i++){
+        document.getElementById("member"+i).style.display = 
+            (i <= count) ? "block" : "none";
     }
+
+    document.querySelectorAll(".member-btn").forEach(btn=>btn.classList.remove("active"));
+    document.getElementById("btn"+count).classList.add("active");
 }
 
-window.onload = function() {
-    setMembers(4, document.querySelector(".member-btn"));
-};
+function confirmSubmit(event){
+    event.preventDefault();
+    document.getElementById("confirmModal").style.display="block";
+}
+
+function finalSubmit(){
+    document.getElementById("groupForm").submit();
+}
+
+function closeConfirm(){
+    document.getElementById("confirmModal").style.display="none";
+}
 </script>
 
 </head>
-
 <body class="p-3">
-
 <div class="container">
+
+<!-- HEADER -->
+<div class="header-box shadow mb-4">
+    <div class="row align-items-center text-center">
+        <div class="col-12 col-md-3 text-md-start mb-2">
+            <img src="{{ url_for('static', filename='images/left_logo.png') }}" width="160">
+        </div>
+        <div class="col-12 col-md-6">
+            <h5 class="fw-bold">Sandip University, Nashik (MS), India</h5>
+            <small>
+                At Post Mahiravani, Trimbak Road, Nashik - 422213, Maharashtra<br>
+                www.sandipuniversity.edu.in
+            </small>
+        </div>
+    </div>
+    <hr>
+    <div class="text-center">
+        <h6>Program: B.Tech CSE | Sem IV <br> Div A</h6>
+        <h6>Subject: Microcontroller & Interfacing</h6>
+        <h6>Faculty: Samiksha Gawali Mam</h6>
+    </div>
+</div>
 
 <h4 class="text-center mb-3 text-white">Project Topic Registration</h4>
 
+<!-- INSTRUCTIONS -->
 <div class="instructions-box">
     <h6>📌 Instructions</h6>
     <ul>
-        <li>You can select 1 to 4 members.</li>
-        <li>Duplicate or similar topics are not allowed.</li>
-        <li>A student cannot register in more than one group.</li>
+        <li>Choose number of members first.</li>
+        <li>Duplicate topics not allowed.</li>
+        <li>PRN must be exactly 12 digits.</li>
     </ul>
 </div>
 
+<!-- FORM -->
 <div class="glass-card mb-4">
-<form method="POST">
+<form method="POST" id="groupForm" onsubmit="confirmSubmit(event)">
+
+<h6>Number of Members</h6>
+<div class="mb-3">
+    <button type="button" id="btn1" class="btn btn-outline-dark member-btn" onclick="selectMembers(1)">1</button>
+    <button type="button" id="btn2" class="btn btn-outline-dark member-btn" onclick="selectMembers(2)">2</button>
+    <button type="button" id="btn3" class="btn btn-outline-dark member-btn" onclick="selectMembers(3)">3</button>
+    <button type="button" id="btn4" class="btn btn-outline-dark member-btn active" onclick="selectMembers(4)">4</button>
+</div>
 
 <h6>Topic</h6>
 <input type="text" name="topic" class="form-control mb-3" required>
 
-<h6 class="text-center mb-3">Select Number of Members</h6>
-
-<div class="member-select-wrapper">
-    <button type="button" class="member-btn active" onclick="setMembers(4, this)">4 Members</button>
-    <button type="button" class="member-btn" onclick="setMembers(3, this)">3 Members</button>
-    <button type="button" class="member-btn" onclick="setMembers(2, this)">2 Members</button>
-    <button type="button" class="member-btn" onclick="setMembers(1, this)">1 Member</button>
-</div>
-
 {% for i in range(1,5) %}
-<div id="member{{i}}" class="member-section">
+<div id="member{{i}}">
 <h6>Member {{i}}</h6>
 <div class="row g-2 mb-3">
     <div class="col-md-6">
@@ -185,10 +190,53 @@ window.onload = function() {
 {% endfor %}
 
 <button type="submit" class="btn btn-primary w-100">Submit</button>
-
 </form>
 </div>
 
+<!-- REGISTERED GROUPS -->
+<div class="glass-card">
+<h5 class="mb-3">Registered Groups ({{ groups|length }}/26)</h5>
+<table class="table table-bordered bg-white">
+<thead class="table-light">
+<tr>
+<th>#</th>
+<th>Topic</th>
+<th>Members</th>
+</tr>
+</thead>
+<tbody>
+{% for g in groups %}
+<tr>
+<td>{{ loop.index }}</td>
+<td>{{ g.topic }}</td>
+<td>
+{{ g.m1_name }} ({{ g.m1_prn }})<br>
+{{ g.m2_name }} ({{ g.m2_prn }})<br>
+{{ g.m3_name }} ({{ g.m3_prn }})<br>
+{{ g.m4_name }} ({{ g.m4_prn }})
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
 </div>
+
+<div class="footer">
+<hr>
+<p>Created by Jayesh Patil</p>
+</div>
+
+</div>
+
+<!-- CONFIRM MODAL -->
+<div id="confirmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6);">
+<div style="background:white; width:350px; padding:25px; border-radius:15px; margin:15% auto; text-align:center;">
+<h5>⚠ Confirm Submission</h5>
+<p>Please check details before submitting.</p>
+<button class="btn btn-success m-2" onclick="finalSubmit()">Yes Submit</button>
+<button class="btn btn-danger m-2" onclick="closeConfirm()">No</button>
+</div>
+</div>
+
 </body>
 </html>

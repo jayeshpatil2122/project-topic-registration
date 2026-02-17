@@ -27,7 +27,6 @@ else:
     print("Using SQLite database")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 db = SQLAlchemy(app)
 
 ADMIN_PASSWORD = "2122"
@@ -43,18 +42,14 @@ class Group(db.Model):
 
     m1_name = db.Column(db.String(100))
     m1_prn = db.Column(db.String(100))
-
     m2_name = db.Column(db.String(100))
     m2_prn = db.Column(db.String(100))
-
     m3_name = db.Column(db.String(100))
     m3_prn = db.Column(db.String(100))
-
     m4_name = db.Column(db.String(100))
     m4_prn = db.Column(db.String(100))
 
 
-# Create tables
 with app.app_context():
     db.create_all()
 
@@ -114,7 +109,7 @@ def index():
                 )
 
         # ===============================
-        # COLLECT MEMBERS (ONLY FILLED ONES)
+        # COLLECT MEMBERS (1–4)
         # ===============================
         members = []
 
@@ -127,7 +122,7 @@ def index():
 
         if len(members) == 0:
             popup = "invalid_group"
-            message = "At least 1 member required"
+            message = "At least 1 member required."
             return render_template(
                 'index.html',
                 groups=existing_groups,
@@ -141,7 +136,7 @@ def index():
         for name, prn in members:
             if not prn.isdigit() or len(prn) != 12:
                 popup = "invalid_prn"
-                message = f"PRN {prn} must be exactly 12 digits"
+                message = f"PRN {prn} must be exactly 12 digits."
                 return render_template(
                     'index.html',
                     groups=existing_groups,
@@ -180,7 +175,7 @@ def index():
                     )
 
         # ===============================
-        # SAVE GROUP (PROPERLY OUTSIDE LOOP)
+        # SAVE GROUP
         # ===============================
         new_group = Group(topic=topic)
 
@@ -199,7 +194,6 @@ def index():
         return redirect('/')
 
     return render_template('index.html', groups=existing_groups)
-
 
 
 # ===============================
@@ -240,19 +234,19 @@ def edit_group(group_id):
         return redirect('/admin')
 
     return render_template('edit_group.html', group=group)
+
+
 # ===============================
-# DELETE GROUP (ADMIN)
+# DELETE GROUP
 # ===============================
 @app.route('/delete/<int:group_id>', methods=['POST'])
 def delete_group(group_id):
 
     group = Group.query.get_or_404(group_id)
-
     db.session.delete(group)
     db.session.commit()
 
     return redirect('/admin')
-
 
 
 # ===============================
@@ -266,10 +260,10 @@ def download_excel():
     for g in groups:
         data.append([
             g.topic,
-            f"{g.m1_name} ({g.m1_prn})",
-            f"{g.m2_name} ({g.m2_prn})",
-            f"{g.m3_name} ({g.m3_prn})",
-            f"{g.m4_name} ({g.m4_prn})"
+            f"{g.m1_name or ''} ({g.m1_prn or ''})",
+            f"{g.m2_name or ''} ({g.m2_prn or ''})",
+            f"{g.m3_name or ''} ({g.m3_prn or ''})",
+            f"{g.m4_name or ''} ({g.m4_prn or ''})"
         ])
 
     df = pd.DataFrame(data, columns=["Topic","Member 1","Member 2","Member 3","Member 4"])
@@ -293,10 +287,10 @@ def download_pdf():
     for g in groups:
         data.append([
             g.topic,
-            f"{g.m1_name} ({g.m1_prn})",
-            f"{g.m2_name} ({g.m2_prn})",
-            f"{g.m3_name} ({g.m3_prn})",
-            f"{g.m4_name} ({g.m4_prn})"
+            f"{g.m1_name or ''} ({g.m1_prn or ''})",
+            f"{g.m2_name or ''} ({g.m2_prn or ''})",
+            f"{g.m3_name or ''} ({g.m3_prn or ''})",
+            f"{g.m4_name or ''} ({g.m4_prn or ''})"
         ])
 
     table = Table(data)
@@ -310,4 +304,4 @@ def download_pdf():
 
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
