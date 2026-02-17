@@ -29,7 +29,7 @@ else:
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-ADMIN_PASSWORD = "2122"
+ADMIN_PASSWORD = "1353"
 
 # ===============================
 # MODEL
