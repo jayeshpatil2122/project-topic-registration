@@ -15,20 +15,16 @@ app = Flask(__name__)
 database_url = os.environ.get("DATABASE_URL")
 
 if database_url:
-    # Use psycopg (v3) driver - Railway provides postgres:// but we need postgresql+psycopg://
-    # Only replace if not already using the correct driver
-    if "postgresql+psycopg://" not in database_url:
-        if database_url.startswith("postgres://"):
-            database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
-        elif database_url.startswith("postgresql://"):
-            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    print(f"Using PostgreSQL database")
+    print("Using PostgreSQL database")
 else:
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///groups.db'
-    print(f"Using SQLite database")
-
+    print("Using SQLite database")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -37,10 +33,10 @@ db = SQLAlchemy(app)
 ADMIN_PASSWORD = "2122"
 
 # ===============================
-# MODEL (FIXED TABLE NAME)
+# MODEL
 # ===============================
 class Group(db.Model):
-    __tablename__ = "groups"   # ✅ IMPORTANT FIX
+    __tablename__ = "groups"
 
     id = db.Column(db.Integer, primary_key=True)
     topic = db.Column(db.String(200), unique=True)
@@ -58,9 +54,7 @@ class Group(db.Model):
     m4_prn = db.Column(db.String(100))
 
 
-# ===============================
-# CREATE TABLES AFTER MODEL
-# ===============================
+# Create tables
 with app.app_context():
     db.create_all()
 
@@ -68,15 +62,13 @@ with app.app_context():
 # ===============================
 # HELPER FUNCTIONS
 # ===============================
-
 def clean_text(text):
     return re.sub(r'\s+', '', text.lower())
 
 def clean_words(text):
     text = text.lower()
     text = re.sub(r'[^a-z\s]', '', text)
-    words = text.split()
-    return set(words)
+    return set(text.split())
 
 def topics_similar(topic1, topic2):
     words1 = clean_words(topic1)
@@ -99,6 +91,8 @@ def index():
     popup = None
     message = None
 
+    existing_groups = Group.query.all()
+
     if request.method == 'POST':
 
         if Group.query.count() >= 26:
@@ -106,19 +100,21 @@ def index():
 
         topic = request.form['topic'].strip()
 
-        existing_groups = Group.query.all()
-
         # 🔎 CHECK DUPLICATE TOPIC
         for g in existing_groups:
             if topics_similar(topic, g.topic):
                 popup = "duplicate_topic"
                 message = f"Topic already selected by Group #{g.id}"
-                return render_template('index.html',
-                                       groups=existing_groups,
-                                       popup=popup,
-                                       message=message)
+                return render_template(
+                    'index.html',
+                    groups=existing_groups,
+                    popup=popup,
+                    message=message
+                )
 
-        # 🔎 CHECK DUPLICATE MEMBERS
+        # ===============================
+        # COLLECT MEMBERS
+        # ===============================
         members = []
 
         for i in range(1, 5):
@@ -126,7 +122,25 @@ def index():
             prn = request.form[f'm{i}_prn'].strip()
             members.append((name, prn))
 
+        # ===============================
+        # PRN VALIDATION (12 digits)
+        # ===============================
+        for name, prn in members:
+            if not prn.isdigit() or len(prn) != 12:
+                popup = "invalid_prn"
+                message = f"PRN {prn} must be exactly 12 digits"
+                return render_template(
+                    'index.html',
+                    groups=existing_groups,
+                    popup=popup,
+                    message=message
+                )
+
+        # ===============================
+        # CHECK MEMBER DUPLICATE
+        # ===============================
         for g in existing_groups:
+
             existing_names = [g.m1_name, g.m2_name, g.m3_name, g.m4_name]
             existing_prns = [g.m1_prn, g.m2_prn, g.m3_prn, g.m4_prn]
 
@@ -135,20 +149,26 @@ def index():
                 if clean_text(prn) in [clean_text(p) for p in existing_prns]:
                     popup = "duplicate_user"
                     message = f"PRN {prn} already in Group #{g.id}"
-                    return render_template('index.html',
-                                           groups=existing_groups,
-                                           popup=popup,
-                                           message=message)
+                    return render_template(
+                        'index.html',
+                        groups=existing_groups,
+                        popup=popup,
+                        message=message
+                    )
 
                 if clean_text(name) in [clean_text(n) for n in existing_names]:
                     popup = "duplicate_user"
                     message = f"{name} already in Group #{g.id}"
-                    return render_template('index.html',
-                                           groups=existing_groups,
-                                           popup=popup,
-                                           message=message)
+                    return render_template(
+                        'index.html',
+                        groups=existing_groups,
+                        popup=popup,
+                        message=message
+                    )
 
-        # 💾 SAVE
+        # ===============================
+        # SAVE GROUP
+        # ===============================
         new_group = Group(
             topic=topic,
             m1_name=members[0][0], m1_prn=members[0][1],
@@ -162,8 +182,7 @@ def index():
 
         return redirect('/')
 
-    groups = Group.query.all()
-    return render_template('index.html', groups=groups)
+    return render_template('index.html', groups=existing_groups)
 
 
 # ===============================
@@ -204,6 +223,19 @@ def edit_group(group_id):
         return redirect('/admin')
 
     return render_template('edit_group.html', group=group)
+# ===============================
+# DELETE GROUP (ADMIN)
+# ===============================
+@app.route('/delete/<int:group_id>', methods=['POST'])
+def delete_group(group_id):
+
+    group = Group.query.get_or_404(group_id)
+
+    db.session.delete(group)
+    db.session.commit()
+
+    return redirect('/admin')
+
 
 
 # ===============================
@@ -262,4 +294,3 @@ def download_pdf():
 
 if __name__ == "__main__":
     app.run()
-
