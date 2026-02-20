@@ -11,9 +11,6 @@
 <style>
 :root{
     --timer-size: 16px;
-    --topic-size: 10px;
-    --member-size: 11px;
-    --footer-size: 11px;
 }
 
 body {
@@ -50,8 +47,6 @@ body {
     border-radius: 15px;
     padding: 18px;
     margin-bottom: 25px;
-    color: #000;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
 }
 
 .member-btn {
@@ -79,29 +74,60 @@ body {
 .footer {
     margin-top: 40px;
     text-align: center;
-    font-size: 13px;     /* Bigger text */
-    font-weight: 550;    /* Bold */
-    color: black;        /* White color */
+    font-size: 13px;
+    font-weight: 550;
+    color: black;
     letter-spacing: 1px;
 }
 
+/* NEW TOPIC STYLE */
+.topic-item {
+    transition: 0.3s ease;
+}
+
+.topic-item:hover {
+    transform: scale(1.05);
+}
+
+.topic-selected {
+    background: linear-gradient(90deg,#ffc107,#ff9800) !important;
+    color: black !important;
+    font-weight: 600;
+}
 </style>
 
 <script>
+
 let memberCount = 4;
 
 function selectMembers(count){
     memberCount = count;
-
     for(let i=1;i<=4;i++){
-        document.getElementById("member"+i).style.display = 
+        document.getElementById("member"+i).style.display =
             (i <= count) ? "block" : "none";
     }
-
     document.querySelectorAll(".member-btn").forEach(btn=>btn.classList.remove("active"));
     document.getElementById("btn"+count).classList.add("active");
 }
 
+/* RELATED TOPICS */
+function toggleTopics(){
+    let section = document.getElementById("topicsSection");
+    section.style.display = (section.style.display === "none") ? "block" : "none";
+}
+
+function selectTopic(element, topic){
+
+    document.querySelectorAll(".topic-item").forEach(item=>{
+        item.classList.remove("topic-selected");
+    });
+
+    element.classList.add("topic-selected");
+    document.querySelector("input[name='topic']").value = topic;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* CONFIRM */
 function confirmSubmit(event){
     event.preventDefault();
     document.getElementById("confirmModal").style.display="block";
@@ -114,7 +140,8 @@ function finalSubmit(){
 function closeConfirm(){
     document.getElementById("confirmModal").style.display="none";
 }
-// TIMER
+
+/* TIMER */
 var deadline = new Date("February 20, 2026 23:59:59").getTime();
 
 setInterval(function () {
@@ -142,7 +169,7 @@ setInterval(function () {
 <body class="p-3">
 <div class="container">
 
-<!-- HEADER -->
+<!-- HEADER (UNCHANGED) -->
 <div class="header-box shadow mb-4">
     <div class="row align-items-center text-center">
         <div class="col-12 col-md-3 text-md-start mb-2">
@@ -150,8 +177,7 @@ setInterval(function () {
         </div>
         <div class="col-12 col-md-6">
             <h5 class="fw-bold">Sandip University, Nashik (MS), India</h5>
-            <small>At Post Mahiravani, Trimbak Road, Nashik - 422213, Maharashtra
-                <br>
+            <small>At Post Mahiravani, Trimbak Road, Nashik - 422213, Maharashtra<br>
                 www.sandipuniversity.edu.in
             </small>
         </div>
@@ -172,9 +198,34 @@ setInterval(function () {
     <ul>
         <li>You can select 1 to 4 members.</li>
         <li>Duplicate or similar topics not allowed.</li>
-        <li>A student cannot register in more than one group</li>
-        
+        <li>A student cannot register in more than one group.</li>
     </ul>
+</div>
+
+<!-- RELATED TOPICS BUTTON -->
+<div class="text-center mb-3">
+    <button class="btn btn-dark px-4" onclick="toggleTopics()">📚 Related Topics</button>
+</div>
+
+<!-- TOPICS LIST -->
+<div id="topicsSection" style="display:none;" class="glass-card mb-4">
+    <h5 class="text-center mb-3">All Topics</h5>
+    <div class="row">
+        {% for topic in all_topics %}
+        <div class="col-md-6 mb-2">
+            {% if topic.lower() in submitted_topics %}
+                <div class="p-2 rounded bg-danger text-white text-center">
+                    {{ topic }} (Submitted)
+                </div>
+            {% else %}
+                <div class="p-2 rounded bg-success text-white text-center topic-item"
+                     onclick="selectTopic(this, '{{ topic }}')" style="cursor:pointer;">
+                    {{ topic }}
+                </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
 </div>
 
 <!-- FORM -->
@@ -200,15 +251,9 @@ setInterval(function () {
         <input type="text" name="m{{i}}_name" class="form-control" placeholder="Name">
     </div>
     <div class="col-md-6">
-        <input type="text"
-               name="m{{i}}_prn"
-               class="form-control"
-               placeholder="PRN"
-               pattern="\d{12}"
-               maxlength="12"
-               minlength="12"
-               inputmode="numeric"
-               title="PRN must be exactly 12 digits">
+        <input type="text" name="m{{i}}_prn" class="form-control"
+               placeholder="PRN" pattern="\d{12}" maxlength="12"
+               minlength="12" inputmode="numeric">
     </div>
 </div>
 </div>
@@ -217,12 +262,13 @@ setInterval(function () {
 <button type="submit" class="btn btn-primary w-100">Submit</button>
 </form>
 </div>
+
 <!-- TIMER -->
 <div class="timer-section mb-4">
 FORM CLOSES IN: <span id="timer"></span>
 </div>
 
-<!-- REGISTERED GROUPS -->
+<!-- REGISTERED GROUPS (UNCHANGED) -->
 <div class="glass-card">
 <h5 class="mb-3">Registered Groups ({{ groups|length }}/26)</h5>
 <table class="table table-bordered bg-white">
@@ -257,28 +303,5 @@ FORM CLOSES IN: <span id="timer"></span>
 
 </div>
 
-<!-- CONFIRM MODAL -->
-<div id="confirmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6);">
-<div style="background:white; width:350px; padding:25px; border-radius:15px; margin:15% auto; text-align:center;">
-<h5>⚠ Confirm Submission</h5>
-<p>Please check details before submitting.</p>
-<button class="btn btn-success m-2" onclick="finalSubmit()">Yes Submit</button>
-<button class="btn btn-danger m-2" onclick="closeConfirm()">No</button>
-</div>
-</div>
-
-<!-- ERROR POPUP -->
-{% if popup %}
-<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999;">
-<div style="background:white; width:400px; padding:25px; border-radius:20px; margin:12% auto; text-align:center;">
-<h5 style="color:#dc3545;">⚠ Registration Error</h5>
-<p style="margin-top:15px;">{{ message }}</p>
-<button class="btn btn-dark mt-3"
-onclick="this.closest('div').parentElement.style.display='none'">OK</button>
-</div>
-</div>
-{% endif %}
-
 </body>
 </html>
-

@@ -193,7 +193,42 @@ def index():
 
         return redirect('/')
 
-    return render_template('index.html', groups=existing_groups)
+    # ===============================
+    # PREDEFINED TOPICS
+    # ===============================
+    predefined_topics = [
+        "Smart Irrigation System",
+        "Automatic Street Light",
+        "Temperature Monitoring System",
+        "Smart Parking System",
+        "Home Automation using Arduino",
+        "RFID Attendance System",
+        "Fire Detection System",
+        "Clap Switch",
+        "Digital Voltmeter",
+        "Smart Dustbin",
+        "Obstacle Avoiding Robot",
+        "Water Level Indicator",
+        "Gas Leakage Detection",
+        "Smart Traffic Control",
+        "Heart Rate Monitor",
+        "Weather Monitoring System",
+        "Smart Energy Meter",
+        "Voice Controlled Robot",
+        "Automatic Plant Watering",
+        "Solar Tracking System"
+    ]
+
+    selected_topics = [g.topic.lower() for g in existing_groups]
+
+    return render_template(
+        'index.html',
+        groups=existing_groups,
+        popup=popup,
+        message=message,
+        predefined_topics=predefined_topics,
+        selected_topics=selected_topics
+    )
 
 
 # ===============================
