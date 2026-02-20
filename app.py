@@ -196,7 +196,7 @@ def index():
     # ===============================
     # PREDEFINED TOPICS
     # ===============================
-    predefined_topics = [
+    all_topics = [
         "Smart Irrigation System",
         "Automatic Street Light",
         "Temperature Monitoring System",
@@ -219,15 +219,15 @@ def index():
         "Solar Tracking System"
     ]
 
-    selected_topics = [g.topic.lower() for g in existing_groups]
+    submitted_topics = [g.topic.lower() for g in existing_groups]
 
     return render_template(
         'index.html',
         groups=existing_groups,
         popup=popup,
         message=message,
-        predefined_topics=predefined_topics,
-        selected_topics=selected_topics
+        all_topics=all_topics,
+        submitted_topics=submitted_topics
     )
 
 
