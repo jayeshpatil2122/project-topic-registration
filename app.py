@@ -86,116 +86,6 @@ def index():
     popup = None
     message = None
     existing_groups = Group.query.all()
-
-    if request.method == 'POST':
-
-        if Group.query.count() >= 26:
-            return "🚫 Maximum 26 Groups Allowed."
-
-        topic = request.form['topic'].strip()
-
-        # ===============================
-        # CHECK DUPLICATE TOPIC
-        # ===============================
-        for g in existing_groups:
-            if topics_similar(topic, g.topic):
-                popup = "duplicate_topic"
-                message = f"Topic already selected by Group #{g.id}"
-                return render_template(
-                    'index.html',
-                    groups=existing_groups,
-                    popup=popup,
-                    message=message
-                )
-
-        # ===============================
-        # COLLECT MEMBERS (1–4)
-        # ===============================
-        members = []
-
-        for i in range(1, 5):
-            name = request.form.get(f'm{i}_name', '').strip()
-            prn = request.form.get(f'm{i}_prn', '').strip()
-
-            if name and prn:
-                members.append((name, prn))
-
-        if len(members) == 0:
-            popup = "invalid_group"
-            message = "At least 1 member required."
-            return render_template(
-                'index.html',
-                groups=existing_groups,
-                popup=popup,
-                message=message
-            )
-
-        # ===============================
-        # PRN VALIDATION (12 digits)
-        # ===============================
-        for name, prn in members:
-            if not prn.isdigit() or len(prn) != 12:
-                popup = "invalid_prn"
-                message = f"PRN {prn} must be exactly 12 digits."
-                return render_template(
-                    'index.html',
-                    groups=existing_groups,
-                    popup=popup,
-                    message=message
-                )
-
-        # ===============================
-        # CHECK DUPLICATE MEMBERS
-        # ===============================
-        for g in existing_groups:
-
-            existing_names = [g.m1_name, g.m2_name, g.m3_name, g.m4_name]
-            existing_prns = [g.m1_prn, g.m2_prn, g.m3_prn, g.m4_prn]
-
-            for name, prn in members:
-
-                if clean_text(prn) in [clean_text(p) for p in existing_prns if p]:
-                    popup = "duplicate_user"
-                    message = f"PRN {prn} already in Group #{g.id}"
-                    return render_template(
-                        'index.html',
-                        groups=existing_groups,
-                        popup=popup,
-                        message=message
-                    )
-
-                if clean_text(name) in [clean_text(n) for n in existing_names if n]:
-                    popup = "duplicate_user"
-                    message = f"{name} already in Group #{g.id}"
-                    return render_template(
-                        'index.html',
-                        groups=existing_groups,
-                        popup=popup,
-                        message=message
-                    )
-
-        # ===============================
-        # SAVE GROUP
-        # ===============================
-        new_group = Group(topic=topic)
-
-        if len(members) >= 1:
-            new_group.m1_name, new_group.m1_prn = members[0]
-        if len(members) >= 2:
-            new_group.m2_name, new_group.m2_prn = members[1]
-        if len(members) >= 3:
-            new_group.m3_name, new_group.m3_prn = members[2]
-        if len(members) >= 4:
-            new_group.m4_name, new_group.m4_prn = members[3]
-
-        db.session.add(new_group)
-        db.session.commit()
-
-        return redirect('/')
-
-    # ===============================
-    # PREDEFINED TOPICS
-    # ===============================
     all_topics = [
         "Smart Irrigation System",
         "Automatic Street Light",
@@ -218,17 +108,100 @@ def index():
         "Automatic Plant Watering",
         "Solar Tracking System"
     ]
+    submitted_topics = {clean_text(g.topic) for g in existing_groups if g.topic}
 
-    submitted_topics = [g.topic.lower() for g in existing_groups]
+    def render_index():
+        return render_template(
+            'index.html',
+            groups=existing_groups,
+            popup=popup,
+            message=message,
+            all_topics=all_topics,
+            submitted_topics=submitted_topics
+        )
 
-    return render_template(
-        'index.html',
-        groups=existing_groups,
-        popup=popup,
-        message=message,
-        all_topics=all_topics,
-        submitted_topics=submitted_topics
-    )
+    if request.method == 'POST':
+
+        if Group.query.count() >= 26:
+            return "🚫 Maximum 26 Groups Allowed."
+
+        topic = request.form['topic'].strip()
+
+        # ===============================
+        # CHECK DUPLICATE TOPIC
+        # ===============================
+        for g in existing_groups:
+            if topics_similar(topic, g.topic):
+                popup = "duplicate_topic"
+                message = f"Topic already selected by Group #{g.id}"
+                return render_index()
+
+        # ===============================
+        # COLLECT MEMBERS (1–4)
+        # ===============================
+        members = []
+
+        for i in range(1, 5):
+            name = request.form.get(f'm{i}_name', '').strip()
+            prn = request.form.get(f'm{i}_prn', '').strip()
+
+            if name and prn:
+                members.append((name, prn))
+
+        if len(members) == 0:
+            popup = "invalid_group"
+            message = "At least 1 member required."
+            return render_index()
+
+        # ===============================
+        # PRN VALIDATION (12 digits)
+        # ===============================
+        for name, prn in members:
+            if not prn.isdigit() or len(prn) != 12:
+                popup = "invalid_prn"
+                message = f"PRN {prn} must be exactly 12 digits."
+                return render_index()
+
+        # ===============================
+        # CHECK DUPLICATE MEMBERS
+        # ===============================
+        for g in existing_groups:
+
+            existing_names = [g.m1_name, g.m2_name, g.m3_name, g.m4_name]
+            existing_prns = [g.m1_prn, g.m2_prn, g.m3_prn, g.m4_prn]
+
+            for name, prn in members:
+
+                if clean_text(prn) in [clean_text(p) for p in existing_prns if p]:
+                    popup = "duplicate_user"
+                    message = f"PRN {prn} already in Group #{g.id}"
+                    return render_index()
+
+                if clean_text(name) in [clean_text(n) for n in existing_names if n]:
+                    popup = "duplicate_user"
+                    message = f"{name} already in Group #{g.id}"
+                    return render_index()
+
+        # ===============================
+        # SAVE GROUP
+        # ===============================
+        new_group = Group(topic=topic)
+
+        if len(members) >= 1:
+            new_group.m1_name, new_group.m1_prn = members[0]
+        if len(members) >= 2:
+            new_group.m2_name, new_group.m2_prn = members[1]
+        if len(members) >= 3:
+            new_group.m3_name, new_group.m3_prn = members[2]
+        if len(members) >= 4:
+            new_group.m4_name, new_group.m4_prn = members[3]
+
+        db.session.add(new_group)
+        db.session.commit()
+
+        return redirect('/')
+
+    return render_index()
 
 
 # ===============================

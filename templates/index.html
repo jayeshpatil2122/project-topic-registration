@@ -83,10 +83,28 @@ body {
 /* NEW TOPIC STYLE */
 .topic-item {
     transition: 0.3s ease;
+    border: none;
+    width: 100%;
+    text-align: center;
+    padding: 10px;
+    border-radius: 8px;
 }
 
-.topic-item:hover {
+.topic-item:not(:disabled):hover {
     transform: scale(1.05);
+}
+
+.topic-available {
+    background: #198754;
+    color: white;
+    cursor: pointer;
+}
+
+.topic-disabled {
+    background: #dc3545;
+    color: white;
+    cursor: not-allowed;
+    opacity: 0.85;
 }
 
 .topic-selected {
@@ -94,11 +112,35 @@ body {
     color: black !important;
     font-weight: 600;
 }
+
+.confirm-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 16px;
+}
+
+.confirm-modal.show {
+    display: flex;
+}
+
+.confirm-modal-card {
+    max-width: 420px;
+    width: 100%;
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+}
 </style>
 
 <script>
 
 let memberCount = 4;
+let isFinalSubmit = false;
 
 function selectMembers(count){
     memberCount = count;
@@ -123,22 +165,39 @@ function selectTopic(element, topic){
     });
 
     element.classList.add("topic-selected");
-    document.querySelector("input[name='topic']").value = topic;
+    document.getElementById("topicInput").value = topic;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* CONFIRM */
 function confirmSubmit(event){
+    if (isFinalSubmit) {
+        return true;
+    }
+
     event.preventDefault();
-    document.getElementById("confirmModal").style.display="block";
+    let modal = document.getElementById("confirmModal");
+
+    if (!modal) {
+        isFinalSubmit = true;
+        document.getElementById("groupForm").submit();
+        return;
+    }
+
+    modal.classList.add("show");
 }
 
 function finalSubmit(){
+    isFinalSubmit = true;
+    closeConfirm();
     document.getElementById("groupForm").submit();
 }
 
 function closeConfirm(){
-    document.getElementById("confirmModal").style.display="none";
+    let modal = document.getElementById("confirmModal");
+    if (modal) {
+        modal.classList.remove("show");
+    }
 }
 
 /* TIMER */
@@ -192,6 +251,12 @@ setInterval(function () {
 
 <h4 class="text-center mb-3 text-white">Project Topic Registration</h4>
 
+{% if message %}
+<div class="alert alert-warning shadow-sm mb-3" role="alert">
+    {{ message }}
+</div>
+{% endif %}
+
 <!-- INSTRUCTIONS -->
 <div class="instructions-box">
     <h6>📌 Instructions</h6>
@@ -212,17 +277,19 @@ setInterval(function () {
     <h5 class="text-center mb-3">All Topics</h5>
     <div class="row">
         {% for topic in all_topics %}
+        {% set topic_key = topic|lower|replace(' ', '') %}
+        {% set is_submitted = topic_key in submitted_topics %}
         <div class="col-md-6 mb-2">
-            {% if topic.lower() in submitted_topics %}
-                <div class="p-2 rounded bg-danger text-white text-center">
-                    {{ topic }} (Submitted)
-                </div>
-            {% else %}
-                <div class="p-2 rounded bg-success text-white text-center topic-item"
-                     onclick="selectTopic(this, '{{ topic }}')" style="cursor:pointer;">
-                    {{ topic }}
-                </div>
-            {% endif %}
+            <button
+                type="button"
+                class="topic-item {% if is_submitted %}topic-disabled{% else %}topic-available{% endif %}"
+                {% if is_submitted %}disabled{% else %}onclick='selectTopic(this, {{ topic|tojson }})'{% endif %}
+            >
+                {{ topic }}
+                {% if is_submitted %}
+                    <span class="badge text-bg-light ms-2">Submitted</span>
+                {% endif %}
+            </button>
         </div>
         {% endfor %}
     </div>
@@ -241,7 +308,7 @@ setInterval(function () {
 </div>
 
 <h6>Topic</h6>
-<input type="text" name="topic" class="form-control mb-3" required>
+<input type="text" id="topicInput" name="topic" class="form-control mb-3" required>
 
 {% for i in range(1,5) %}
 <div id="member{{i}}">
@@ -261,6 +328,18 @@ setInterval(function () {
 
 <button type="submit" class="btn btn-primary w-100">Submit</button>
 </form>
+</div>
+
+<!-- CONFIRM SUBMIT MODAL -->
+<div id="confirmModal" class="confirm-modal" onclick="if(event.target===this){closeConfirm()}">
+    <div class="confirm-modal-card">
+        <h5 class="mb-3">Confirm Submission</h5>
+        <p class="mb-3">Submit this group with entered members and topic?</p>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary w-50" onclick="closeConfirm()">Cancel</button>
+            <button type="button" class="btn btn-primary w-50" onclick="finalSubmit()">Yes, Submit</button>
+        </div>
+    </div>
 </div>
 
 <!-- TIMER -->
