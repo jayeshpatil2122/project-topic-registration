@@ -108,8 +108,7 @@ body {
 }
 
 .topic-selected {
-    background: linear-gradient(90deg,#ffc107,#ff9800) !important;
-    color: black !important;
+    box-shadow: 0 0 0 2px #ffc107 inset;
     font-weight: 600;
 }
 
@@ -162,9 +161,16 @@ function selectTopic(element, topic){
 
     document.querySelectorAll(".topic-item").forEach(item=>{
         item.classList.remove("topic-selected");
+        if (!item.classList.contains("topic-submitted")) {
+            item.disabled = false;
+            item.classList.remove("topic-disabled");
+            item.classList.add("topic-available");
+        }
     });
 
-    element.classList.add("topic-selected");
+    element.classList.remove("topic-available");
+    element.classList.add("topic-selected", "topic-disabled");
+    element.disabled = true;
     document.getElementById("topicInput").value = topic;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -282,7 +288,7 @@ setInterval(function () {
         <div class="col-md-6 mb-2">
             <button
                 type="button"
-                class="topic-item {% if is_submitted %}topic-disabled{% else %}topic-available{% endif %}"
+                class="topic-item {% if is_submitted %}topic-disabled topic-submitted{% else %}topic-available{% endif %}"
                 {% if is_submitted %}disabled{% else %}onclick='selectTopic(this, {{ topic|tojson }})'{% endif %}
             >
                 {{ topic }}
