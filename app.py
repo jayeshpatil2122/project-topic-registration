@@ -1,9 +1,9 @@
+from reportlab.lib.pagesizes import A4
 from flask import Flask, render_template, request, redirect, send_file
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
 import os
 import re
 
@@ -288,7 +288,7 @@ def download_excel():
 
 
 # ===============================
-# DOWNLOAD PDF (UPDATED FORMAT)
+# DOWNLOAD PDF (FINAL CLEAN VERSION - NO LOGO)
 # ===============================
 @app.route('/download_pdf')
 def download_pdf():
@@ -296,28 +296,73 @@ def download_pdf():
     file_path = "groups.pdf"
     doc = SimpleDocTemplate(file_path, pagesize=A4)
 
-    from reportlab.platypus import Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib import colors
-    from reportlab.platypus import Table, TableStyle
+    from reportlab.lib.units import inch
 
     elements = []
     styles = getSampleStyleSheet()
 
-    # ===== HEADER SECTION =====
-    elements.append(Paragraph("<b>Sandip University, Nashik (MS), India</b>", styles["Title"]))
-    elements.append(Spacer(1, 8))
-    elements.append(Paragraph("Program: B.Tech CSE | Sem IV | Div A", styles["Normal"]))
-    elements.append(Paragraph("Subject: Microcontroller & Interfacing", styles["Normal"]))
-    elements.append(Paragraph("Faculty: Samiksha Gawali Mam", styles["Normal"]))
-    elements.append(Spacer(1, 20))
+    # ===============================
+    # TOP SPACE
+    # ===============================
+    elements.append(Spacer(1, 40))   # top margin space
 
+    # ===============================
+    # CUSTOM STYLES
+    # ===============================
+    university_style = ParagraphStyle(
+        'UniversityStyle',
+        parent=styles['Title'],
+        alignment=1,   # center
+        fontSize=18,
+        spaceAfter=10
+    )
+
+    normal_center = ParagraphStyle(
+        'NormalCenter',
+        parent=styles['Normal'],
+        alignment=1,
+        fontSize=12
+    )
+
+    main_heading = ParagraphStyle(
+        'MainHeading',
+        parent=styles['Heading1'],
+        alignment=1,
+        fontSize=20,
+        spaceBefore=15,
+        spaceAfter=20
+    )
+
+    # ===============================
+    # HEADER TEXT
+    # ===============================
+    elements.append(Paragraph("<b>Sandip University, Nashik (MS), India</b>", university_style))
+    elements.append(Spacer(1, 8))
+
+    elements.append(Paragraph("Program: B.Tech CSE", normal_center))
+    elements.append(Spacer(1, 5))
+
+    elements.append(Paragraph("Sem IV | Div A", normal_center))
+    elements.append(Spacer(1, 5))
+
+    elements.append(Paragraph("Subject: Microcontroller & Interfacing", normal_center))
+    elements.append(Spacer(1, 5))
+
+    elements.append(Paragraph("Faculty: Samiksha Gawali Mam", normal_center))
+    elements.append(Spacer(1, 25))
+
+    elements.append(Paragraph("<b>Mini Project List</b>", main_heading))
+    elements.append(Spacer(1, 15))
+
+    # ===============================
+    # TABLE DATA
+    # ===============================
     groups = Group.query.all()
 
-    # ===== TABLE HEADER =====
-    data = [
-        ["Sr.no", "PRN No", "Project group members", "Project title"]
-    ]
+    data = [["Sr.no", "PRN No", "Project group members", "Project title"]]
 
     sr = 1
 
@@ -343,13 +388,12 @@ def download_pdf():
             f"{sr})",
             prn_text,
             name_text,
-            g.topic
+            g.topic or ""
         ])
 
         sr += 1
 
-    # ===== CREATE TABLE =====
-    table = Table(data, colWidths=[40, 120, 150, 160])
+    table = Table(data, colWidths=[40, 120, 160, 150])
 
     table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.grey),
