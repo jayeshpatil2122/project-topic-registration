@@ -288,70 +288,85 @@ def download_excel():
 
 
 # ===============================
-# DOWNLOAD PDF (FIXED FORMAT)
+# DOWNLOAD PDF (UPDATED FORMAT)
 # ===============================
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import inch
-
 @app.route('/download_pdf')
 def download_pdf():
 
     file_path = "groups.pdf"
     doc = SimpleDocTemplate(file_path, pagesize=A4)
 
+    from reportlab.platypus import Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    from reportlab.platypus import Table, TableStyle
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # ===== HEADER SECTION =====
+    elements.append(Paragraph("<b>Sandip University, Nashik (MS), India</b>", styles["Title"]))
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("Program: B.Tech CSE | Sem IV | Div A", styles["Normal"]))
+    elements.append(Paragraph("Subject: Microcontroller & Interfacing", styles["Normal"]))
+    elements.append(Paragraph("Faculty: Samiksha Gawali Mam", styles["Normal"]))
+    elements.append(Spacer(1, 20))
+
     groups = Group.query.all()
 
-    styles = getSampleStyleSheet()
-    normal_style = styles["Normal"]
+    # ===== TABLE HEADER =====
+    data = [
+        ["Sr.no", "PRN No", "Project group members", "Project title"]
+    ]
 
-    data = []
+    sr = 1
 
-    # HEADER ROW
-    data.append([
-        Paragraph("<b>Topic</b>", normal_style),
-        Paragraph("<b>Member 1</b>", normal_style),
-        Paragraph("<b>Member 2</b>", normal_style),
-        Paragraph("<b>Member 3</b>", normal_style),
-        Paragraph("<b>Member 4</b>", normal_style),
-    ])
-
-    # FORMAT MEMBER (Name on top, PRN below)
-    def format_member(name, prn):
-        if not name:
-            return ""
-        return Paragraph(f"{name}<br/>{prn}", normal_style)
-
-    # ADD DATA ROWS
     for g in groups:
+
+        prns = []
+        names = []
+
+        if g.m1_prn: prns.append(f"1) {g.m1_prn}")
+        if g.m2_prn: prns.append(f"2) {g.m2_prn}")
+        if g.m3_prn: prns.append(f"3) {g.m3_prn}")
+        if g.m4_prn: prns.append(f"4) {g.m4_prn}")
+
+        if g.m1_name: names.append(g.m1_name)
+        if g.m2_name: names.append(g.m2_name)
+        if g.m3_name: names.append(g.m3_name)
+        if g.m4_name: names.append(g.m4_name)
+
+        prn_text = "\n".join(prns)
+        name_text = "\n".join(names)
+
         data.append([
-            Paragraph(g.topic or "", normal_style),
-            format_member(g.m1_name, g.m1_prn),
-            format_member(g.m2_name, g.m2_prn),
-            format_member(g.m3_name, g.m3_prn),
-            format_member(g.m4_name, g.m4_prn),
+            f"{sr})",
+            prn_text,
+            name_text,
+            g.topic
         ])
 
-    # FIX COLUMN WIDTHS (IMPORTANT)
-    table = Table(
-        data,
-        colWidths=[1.2*inch, 1.3*inch, 1.3*inch, 1.3*inch, 1.3*inch]
-    )
+        sr += 1
+
+    # ===== CREATE TABLE =====
+    table = Table(data, colWidths=[40, 120, 150, 160])
 
     table.setStyle(TableStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.grey),
-        ('GRID',(0,0),(-1,-1),1,colors.black),
+        ('BACKGROUND', (0,0), (-1,0), colors.grey),
+        ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
         ('VALIGN',(0,0),(-1,-1),'TOP'),
-        ('LEFTPADDING',(0,0),(-1,-1),5),
-        ('RIGHTPADDING',(0,0),(-1,-1),5),
+        ('LEFTPADDING',(0,0),(-1,-1),6),
+        ('RIGHTPADDING',(0,0),(-1,-1),6),
+        ('TOPPADDING',(0,0),(-1,-1),6),
+        ('BOTTOMPADDING',(0,0),(-1,-1),6),
     ]))
 
-    doc.build([table])
+    elements.append(table)
+
+    doc.build(elements)
 
     return send_file(file_path, as_attachment=True)
-
 
 
 if __name__ == "__main__":
