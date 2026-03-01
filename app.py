@@ -1,9 +1,9 @@
 from reportlab.lib.pagesizes import A4
-from flask import Flask, render_template, request, redirect, send_file
+from flask import Flask, render_template, request, redirect, send_file, session, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table
-from reportlab.lib import colors
 import os
 import re
 
@@ -20,16 +20,66 @@ if database_url:
     elif database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     print("Using PostgreSQL database")
 else:
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///groups.db'
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///groups.db"
     print("Using SQLite database")
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "group-project-dev-secret")
 db = SQLAlchemy(app)
 
 ADMIN_PASSWORD = "1353"
+MAX_GROUPS_PER_SUBJECT = 26
+DEFAULT_SUBJECT_KEY = "microcontroller-interfacing"
+
+SUBJECTS = [
+    {
+        "key": "microcontroller-interfacing",
+        "name": "Microcontroller & Interfacing",
+        "faculty": "Samiksha Gawali Mam",
+        "deadline": "March 31, 2026 23:59:59",
+        "topics": [
+            "Smart Irrigation System",
+            "Temperature Monitoring System",
+            "Smart Parking System",
+            "Home Automation using Arduino",
+            "Digital Voltmeter",
+            "Smart Dustbin",
+            "Obstacle Avoiding Robot",
+            "Heart Rate Monitor",
+            "Weather Monitoring System",
+            "Smart Energy Meter",
+            "Voice Controlled Robot",
+            "Automatic Plant Watering",
+            "Solar Tracking System",
+        ],
+    },
+    {
+        "key": "digital-electronics",
+        "name": "Digital Electronics",
+        "faculty": "Samiksha Gawali Mam",
+        "deadline": "March 31, 2026 23:59:59",
+        "topics": [
+            "Digital Clock using Counters",
+            "4-bit ALU Design",
+            "Traffic Light Controller",
+            "Sequence Detector",
+            "Parity Generator and Checker",
+            "Digital Dice",
+            "Frequency Divider Circuit",
+            "Seven Segment Display Driver",
+            "PWM Generator",
+            "Binary to Gray Code Converter",
+            "Digital Voting Machine",
+            "Shift Register Applications",
+            "Up/Down Counter",
+        ],
+    },
+]
+SUBJECTS_BY_KEY = {subject["key"]: subject for subject in SUBJECTS}
+
 
 # ===============================
 # MODEL
@@ -38,7 +88,8 @@ class Group(db.Model):
     __tablename__ = "groups"
 
     id = db.Column(db.Integer, primary_key=True)
-    topic = db.Column(db.String(200), unique=True)
+    subject = db.Column(db.String(100), nullable=False, default=DEFAULT_SUBJECT_KEY, index=True)
+    topic = db.Column(db.String(200))
 
     m1_name = db.Column(db.String(100))
     m1_prn = db.Column(db.String(100))
@@ -50,20 +101,102 @@ class Group(db.Model):
     m4_prn = db.Column(db.String(100))
 
 
+def ensure_subject_column():
+    columns = [col["name"] for col in inspect(db.engine).get_columns("groups")]
+    with db.engine.begin() as connection:
+        if "subject" not in columns:
+            connection.execute(text("ALTER TABLE groups ADD COLUMN subject VARCHAR(100)"))
+        connection.execute(
+            text(
+                "UPDATE groups SET subject = :default_subject "
+                "WHERE subject IS NULL OR subject = ''"
+            ),
+            {"default_subject": DEFAULT_SUBJECT_KEY},
+        )
+
+
+def migrate_sqlite_drop_topic_unique(connection):
+    connection.execute(
+        text(
+            """
+            CREATE TABLE groups_new (
+                id INTEGER PRIMARY KEY,
+                subject VARCHAR(100) NOT NULL,
+                topic VARCHAR(200),
+                m1_name VARCHAR(100),
+                m1_prn VARCHAR(100),
+                m2_name VARCHAR(100),
+                m2_prn VARCHAR(100),
+                m3_name VARCHAR(100),
+                m3_prn VARCHAR(100),
+                m4_name VARCHAR(100),
+                m4_prn VARCHAR(100)
+            )
+            """
+        )
+    )
+    connection.execute(
+        text(
+            """
+            INSERT INTO groups_new (
+                id, subject, topic, m1_name, m1_prn, m2_name, m2_prn, m3_name, m3_prn, m4_name, m4_prn
+            )
+            SELECT
+                id,
+                COALESCE(NULLIF(subject, ''), :default_subject),
+                topic, m1_name, m1_prn, m2_name, m2_prn, m3_name, m3_prn, m4_name, m4_prn
+            FROM groups
+            """
+        ),
+        {"default_subject": DEFAULT_SUBJECT_KEY},
+    )
+    connection.execute(text("DROP TABLE groups"))
+    connection.execute(text("ALTER TABLE groups_new RENAME TO groups"))
+    connection.execute(text("CREATE INDEX IF NOT EXISTS ix_groups_subject ON groups (subject)"))
+
+
+def ensure_topic_is_not_unique():
+    unique_constraints = inspect(db.engine).get_unique_constraints("groups")
+    topic_constraints = [
+        constraint for constraint in unique_constraints if constraint.get("column_names") == ["topic"]
+    ]
+    if not topic_constraints:
+        return
+
+    with db.engine.begin() as connection:
+        dialect = db.engine.dialect.name
+
+        if dialect == "sqlite":
+            migrate_sqlite_drop_topic_unique(connection)
+            return
+
+        for constraint in topic_constraints:
+            constraint_name = constraint.get("name")
+            if not constraint_name:
+                continue
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", constraint_name):
+                continue
+            connection.execute(text(f"ALTER TABLE groups DROP CONSTRAINT {constraint_name}"))
+
+
 with app.app_context():
     db.create_all()
+    ensure_subject_column()
+    ensure_topic_is_not_unique()
 
 
 # ===============================
 # HELPER FUNCTIONS
 # ===============================
 def clean_text(text):
-    return re.sub(r'\s+', '', text.lower())
+    return re.sub(r"\s+", "", (text or "").lower())
+
 
 def clean_words(text):
-    text = text.lower()
-    text = re.sub(r'[^a-z\s]', '', text)
+    text = (text or "").lower()
+    text = re.sub(r"[^a-z\s]", "", text)
     return set(text.split())
+
 
 def topics_similar(topic1, topic2):
     words1 = clean_words(topic1)
@@ -77,48 +210,67 @@ def topics_similar(topic1, topic2):
     return similarity_ratio >= 0.7
 
 
+def normalize_subject_key(subject_key):
+    key = (subject_key or "").strip().lower()
+    if key in SUBJECTS_BY_KEY:
+        return key
+    return DEFAULT_SUBJECT_KEY
+
+
+def get_selected_subject_key():
+    raw_subject = request.values.get("subject")
+    return normalize_subject_key(raw_subject)
+
+
+def get_groups_for_subject(subject_key):
+    return Group.query.filter_by(subject=subject_key).order_by(Group.id.asc()).all()
+
+
+def admin_required_redirect():
+    if not session.get("is_admin"):
+        return redirect(url_for("admin"))
+    return None
+
+
 # ===============================
 # STUDENT PAGE
 # ===============================
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-
     popup = None
     message = None
-    existing_groups = Group.query.all()
-    all_topics = [
-        "Smart Irrigation System",
-        "Temperature Monitoring System",
-        "Smart Parking System",
-        "Home Automation using Arduino",
-        "Digital Voltmeter",
-        "Smart Dustbin ",
-        "Obstacle Avoiding Robot",
-        "Heart Rate Monitor",
-        "Weather Monitoring System",
-        "Smart Energy Meter",
-        "Voice Controlled Robot",
-        "Automatic Plant Watering",
-        "Solar Tracking System"
-    ]
+
+    selected_subject_key = get_selected_subject_key()
+    selected_subject = SUBJECTS_BY_KEY[selected_subject_key]
+    existing_groups = get_groups_for_subject(selected_subject_key)
+    all_topics = selected_subject["topics"]
     submitted_topics = {clean_text(g.topic) for g in existing_groups if g.topic}
 
     def render_index():
         return render_template(
-            'index.html',
+            "index.html",
             groups=existing_groups,
             popup=popup,
             message=message,
             all_topics=all_topics,
-            submitted_topics=submitted_topics
+            submitted_topics=submitted_topics,
+            subjects=SUBJECTS,
+            selected_subject=selected_subject,
+            selected_subject_key=selected_subject_key,
+            max_groups_per_subject=MAX_GROUPS_PER_SUBJECT,
         )
 
-    if request.method == 'POST':
+    if request.method == "POST":
+        if Group.query.filter_by(subject=selected_subject_key).count() >= MAX_GROUPS_PER_SUBJECT:
+            popup = "max_groups"
+            message = f"Maximum {MAX_GROUPS_PER_SUBJECT} groups allowed for this subject."
+            return render_index()
 
-        if Group.query.count() >= 26:
-            return "🚫 Maximum 26 Groups Allowed."
-
-        topic = request.form['topic'].strip()
+        topic = request.form.get("topic", "").strip()
+        if not topic:
+            popup = "invalid_topic"
+            message = "Topic is required."
+            return render_index()
 
         # ===============================
         # CHECK DUPLICATE TOPIC
@@ -126,30 +278,30 @@ def index():
         for g in existing_groups:
             if topics_similar(topic, g.topic):
                 popup = "duplicate_topic"
-                message = f"Topic already selected by Group #{g.id}"
+                message = f"Topic already selected by Group #{g.id} in this subject."
                 return render_index()
 
         # ===============================
-        # COLLECT MEMBERS (1–4)
+        # COLLECT MEMBERS (1-4)
         # ===============================
         members = []
 
         for i in range(1, 5):
-            name = request.form.get(f'm{i}_name', '').strip()
-            prn = request.form.get(f'm{i}_prn', '').strip()
+            name = request.form.get(f"m{i}_name", "").strip()
+            prn = request.form.get(f"m{i}_prn", "").strip()
 
             if name and prn:
                 members.append((name, prn))
 
         if len(members) == 0:
             popup = "invalid_group"
-            message = "At least 1 member required."
+            message = "At least 1 member is required."
             return render_index()
 
         # ===============================
         # PRN VALIDATION (12 digits)
         # ===============================
-        for name, prn in members:
+        for _name, prn in members:
             if not prn.isdigit() or len(prn) != 12:
                 popup = "invalid_prn"
                 message = f"PRN {prn} must be exactly 12 digits."
@@ -159,26 +311,24 @@ def index():
         # CHECK DUPLICATE MEMBERS
         # ===============================
         for g in existing_groups:
-
             existing_names = [g.m1_name, g.m2_name, g.m3_name, g.m4_name]
             existing_prns = [g.m1_prn, g.m2_prn, g.m3_prn, g.m4_prn]
 
             for name, prn in members:
-
                 if clean_text(prn) in [clean_text(p) for p in existing_prns if p]:
                     popup = "duplicate_user"
-                    message = f"PRN {prn} already in Group #{g.id}"
+                    message = f"PRN {prn} already in Group #{g.id} for this subject."
                     return render_index()
 
                 if clean_text(name) in [clean_text(n) for n in existing_names if n]:
                     popup = "duplicate_user"
-                    message = f"{name} already in Group #{g.id}"
+                    message = f"{name} already in Group #{g.id} for this subject."
                     return render_index()
 
         # ===============================
         # SAVE GROUP
         # ===============================
-        new_group = Group(topic=topic)
+        new_group = Group(topic=topic, subject=selected_subject_key)
 
         if len(members) >= 1:
             new_group.m1_name, new_group.m1_prn = members[0]
@@ -192,225 +342,256 @@ def index():
         db.session.add(new_group)
         db.session.commit()
 
-        return redirect('/')
+        return redirect(url_for("index", subject=selected_subject_key))
 
     return render_index()
 
 
 # ===============================
-# ADMIN LOGIN
+# ADMIN LOGIN + PANEL
 # ===============================
-@app.route('/admin', methods=['GET', 'POST'])
+@app.route("/admin", methods=["GET", "POST"])
 def admin():
-    if request.method == 'POST':
-        if request.form['password'] == ADMIN_PASSWORD:
-            groups = Group.query.all()
-            return render_template('admin.html', groups=groups)
-        else:
-            return render_template('admin_login.html', error="Wrong Password!")
+    if request.method == "POST" and "password" in request.form:
+        if request.form["password"] == ADMIN_PASSWORD:
+            session["is_admin"] = True
+            return redirect(url_for("admin", subject=get_selected_subject_key()))
+        return render_template("admin_login.html", error="Wrong Password!")
 
-    return render_template('admin_login.html')
+    if not session.get("is_admin"):
+        return render_template("admin_login.html")
+
+    selected_subject_key = get_selected_subject_key()
+    groups = get_groups_for_subject(selected_subject_key)
+
+    return render_template(
+        "admin.html",
+        groups=groups,
+        subjects=SUBJECTS,
+        selected_subject_key=selected_subject_key,
+        selected_subject=SUBJECTS_BY_KEY[selected_subject_key],
+    )
+
+
+@app.route("/admin/logout", methods=["POST"])
+def admin_logout():
+    session.pop("is_admin", None)
+    return redirect(url_for("admin"))
 
 
 # ===============================
 # EDIT GROUP
 # ===============================
-@app.route('/edit/<int:group_id>', methods=['GET', 'POST'])
+@app.route("/edit/<int:group_id>", methods=["GET", "POST"])
 def edit_group(group_id):
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
 
     group = Group.query.get_or_404(group_id)
 
-    if request.method == 'POST':
-        group.topic = request.form['topic']
-        group.m1_name = request.form['m1_name']
-        group.m1_prn = request.form['m1_prn']
-        group.m2_name = request.form['m2_name']
-        group.m2_prn = request.form['m2_prn']
-        group.m3_name = request.form['m3_name']
-        group.m3_prn = request.form['m3_prn']
-        group.m4_name = request.form['m4_name']
-        group.m4_prn = request.form['m4_prn']
+    if request.method == "POST":
+        group.subject = normalize_subject_key(request.form.get("subject", group.subject))
+        group.topic = request.form.get("topic", "").strip()
+        group.m1_name = request.form.get("m1_name", "").strip()
+        group.m1_prn = request.form.get("m1_prn", "").strip()
+        group.m2_name = request.form.get("m2_name", "").strip()
+        group.m2_prn = request.form.get("m2_prn", "").strip()
+        group.m3_name = request.form.get("m3_name", "").strip()
+        group.m3_prn = request.form.get("m3_prn", "").strip()
+        group.m4_name = request.form.get("m4_name", "").strip()
+        group.m4_prn = request.form.get("m4_prn", "").strip()
 
         db.session.commit()
-        return redirect('/admin')
+        return redirect(url_for("admin", subject=group.subject))
 
-    return render_template('edit_group.html', group=group)
+    return render_template(
+        "edit_group.html",
+        group=group,
+        subjects=SUBJECTS,
+        selected_subject_key=normalize_subject_key(group.subject),
+    )
 
 
 # ===============================
 # DELETE GROUP
 # ===============================
-@app.route('/delete/<int:group_id>', methods=['POST'])
+@app.route("/delete/<int:group_id>", methods=["POST"])
 def delete_group(group_id):
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
 
     group = Group.query.get_or_404(group_id)
+    redirect_subject = normalize_subject_key(request.form.get("subject", group.subject))
     db.session.delete(group)
     db.session.commit()
 
-    return redirect('/admin')
+    return redirect(url_for("admin", subject=redirect_subject))
 
 
 # ===============================
-# DOWNLOAD EXCEL (FIXED VERSION)
+# DOWNLOAD EXCEL
 # ===============================
-@app.route('/download_excel')
+@app.route("/download_excel")
 def download_excel():
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
 
-    groups = Group.query.all()
+    selected_subject_key = get_selected_subject_key()
+    selected_subject = SUBJECTS_BY_KEY[selected_subject_key]
+    groups = get_groups_for_subject(selected_subject_key)
 
     data = []
 
     for g in groups:
-        data.append([
-            g.topic or "",
-            f"{g.m1_name or ''}\n{g.m1_prn or ''}",
-            f"{g.m2_name or ''}\n{g.m2_prn or ''}",
-            f"{g.m3_name or ''}\n{g.m3_prn or ''}",
-            f"{g.m4_name or ''}\n{g.m4_prn or ''}"
-        ])
+        data.append(
+            [
+                g.topic or "",
+                f"{g.m1_name or ''}\n{g.m1_prn or ''}",
+                f"{g.m2_name or ''}\n{g.m2_prn or ''}",
+                f"{g.m3_name or ''}\n{g.m3_prn or ''}",
+                f"{g.m4_name or ''}\n{g.m4_prn or ''}",
+            ]
+        )
 
     df = pd.DataFrame(
         data,
-        columns=["Topic","Member 1","Member 2","Member 3","Member 4"]
+        columns=["Topic", "Member 1", "Member 2", "Member 3", "Member 4"],
     )
 
-    file_path = "groups.xlsx"
-
-    # IMPORTANT: force openpyxl engine
+    safe_subject = selected_subject_key.replace("-", "_")
+    file_path = f"groups_{safe_subject}.xlsx"
     df.to_excel(file_path, index=False, engine="openpyxl")
 
     return send_file(
         file_path,
         as_attachment=True,
-        download_name="groups.xlsx"
+        download_name=f"{selected_subject['name']} Groups.xlsx",
     )
 
 
-
 # ===============================
-# DOWNLOAD PDF (FINAL CLEAN VERSION - NO LOGO)
+# DOWNLOAD PDF
 # ===============================
-@app.route('/download_pdf')
+@app.route("/download_pdf")
 def download_pdf():
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
 
-    file_path = "groups.pdf"
+    selected_subject_key = get_selected_subject_key()
+    selected_subject = SUBJECTS_BY_KEY[selected_subject_key]
+    groups = get_groups_for_subject(selected_subject_key)
+
+    safe_subject = selected_subject_key.replace("-", "_")
+    file_path = f"groups_{safe_subject}.pdf"
     doc = SimpleDocTemplate(file_path, pagesize=A4)
 
-    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import Paragraph, Spacer, TableStyle
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib import colors
-    from reportlab.lib.units import inch
 
     elements = []
     styles = getSampleStyleSheet()
 
-    # ===============================
-    # TOP SPACE
-    # ===============================
-    elements.append(Spacer(1, 40))   # top margin space
+    elements.append(Spacer(1, 40))
 
-    # ===============================
-    # CUSTOM STYLES
-    # ===============================
     university_style = ParagraphStyle(
-        'UniversityStyle',
-        parent=styles['Title'],
-        alignment=1,   # center
+        "UniversityStyle",
+        parent=styles["Title"],
+        alignment=1,
         fontSize=18,
-        spaceAfter=10
+        spaceAfter=10,
     )
 
     normal_center = ParagraphStyle(
-        'NormalCenter',
-        parent=styles['Normal'],
+        "NormalCenter",
+        parent=styles["Normal"],
         alignment=1,
-        fontSize=12
+        fontSize=12,
     )
 
     main_heading = ParagraphStyle(
-        'MainHeading',
-        parent=styles['Heading1'],
+        "MainHeading",
+        parent=styles["Heading1"],
         alignment=1,
         fontSize=20,
         spaceBefore=15,
-        spaceAfter=20
+        spaceAfter=20,
     )
 
-    # ===============================
-    # HEADER TEXT
-    # ===============================
     elements.append(Paragraph("<b>Sandip University, Nashik (MS), India</b>", university_style))
     elements.append(Spacer(1, 8))
-
     elements.append(Paragraph("Program: B.Tech CSE", normal_center))
     elements.append(Spacer(1, 5))
-
     elements.append(Paragraph("Sem IV | Div A", normal_center))
     elements.append(Spacer(1, 5))
-
-    elements.append(Paragraph("Subject: Microcontroller & Interfacing", normal_center))
+    elements.append(Paragraph(f"Subject: {selected_subject['name']}", normal_center))
     elements.append(Spacer(1, 5))
-
-    elements.append(Paragraph("Faculty: Samiksha Gawali Mam", normal_center))
+    elements.append(Paragraph(f"Faculty: {selected_subject['faculty']}", normal_center))
     elements.append(Spacer(1, 25))
-
     elements.append(Paragraph("<b>Mini Project List</b>", main_heading))
     elements.append(Spacer(1, 15))
 
-    # ===============================
-    # TABLE DATA
-    # ===============================
-    groups = Group.query.all()
-
     data = [["Sr.no", "PRN No", "Project group members", "Project title"]]
 
-    sr = 1
-
-    for g in groups:
-
+    for sr, g in enumerate(groups, start=1):
         prns = []
         names = []
 
-        if g.m1_prn: prns.append(f"1) {g.m1_prn}")
-        if g.m2_prn: prns.append(f"2) {g.m2_prn}")
-        if g.m3_prn: prns.append(f"3) {g.m3_prn}")
-        if g.m4_prn: prns.append(f"4) {g.m4_prn}")
+        if g.m1_prn:
+            prns.append(f"1) {g.m1_prn}")
+        if g.m2_prn:
+            prns.append(f"2) {g.m2_prn}")
+        if g.m3_prn:
+            prns.append(f"3) {g.m3_prn}")
+        if g.m4_prn:
+            prns.append(f"4) {g.m4_prn}")
 
-        if g.m1_name: names.append(g.m1_name)
-        if g.m2_name: names.append(g.m2_name)
-        if g.m3_name: names.append(g.m3_name)
-        if g.m4_name: names.append(g.m4_name)
+        if g.m1_name:
+            names.append(g.m1_name)
+        if g.m2_name:
+            names.append(g.m2_name)
+        if g.m3_name:
+            names.append(g.m3_name)
+        if g.m4_name:
+            names.append(g.m4_name)
 
-        prn_text = "\n".join(prns)
-        name_text = "\n".join(names)
-
-        data.append([
-            f"{sr})",
-            prn_text,
-            name_text,
-            g.topic or ""
-        ])
-
-        sr += 1
+        data.append(
+            [
+                f"{sr})",
+                "\n".join(prns),
+                "\n".join(names),
+                g.topic or "",
+            ]
+        )
 
     table = Table(data, colWidths=[40, 120, 160, 150])
-
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 1, colors.black),
-        ('VALIGN',(0,0),(-1,-1),'TOP'),
-        ('LEFTPADDING',(0,0),(-1,-1),6),
-        ('RIGHTPADDING',(0,0),(-1,-1),6),
-        ('TOPPADDING',(0,0),(-1,-1),6),
-        ('BOTTOMPADDING',(0,0),(-1,-1),6),
-    ]))
-
+    table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     elements.append(table)
 
     doc.build(elements)
 
-    return send_file(file_path, as_attachment=True)
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=f"{selected_subject['name']} Groups.pdf",
+    )
 
 
 if __name__ == "__main__":

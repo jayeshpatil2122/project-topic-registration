@@ -4,7 +4,6 @@
     <title>Project Topic Registration</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 
@@ -61,6 +60,11 @@ body {
     color: white;
 }
 
+.subject-switch .btn {
+    border-radius: 999px;
+    font-weight: 600;
+}
+
 .timer-section {
     background: linear-gradient(90deg, #ff512f, #dd2476);
     padding: 12px;
@@ -80,7 +84,6 @@ body {
     letter-spacing: 1px;
 }
 
-/* NEW TOPIC STYLE */
 .topic-item {
     transition: 0.3s ease;
     border: none;
@@ -137,28 +140,24 @@ body {
 </style>
 
 <script>
-
 let memberCount = 4;
 let isFinalSubmit = false;
 
 function selectMembers(count){
     memberCount = count;
     for(let i=1;i<=4;i++){
-        document.getElementById("member"+i).style.display =
-            (i <= count) ? "block" : "none";
+        document.getElementById("member"+i).style.display = (i <= count) ? "block" : "none";
     }
     document.querySelectorAll(".member-btn").forEach(btn=>btn.classList.remove("active"));
     document.getElementById("btn"+count).classList.add("active");
 }
 
-/* RELATED TOPICS */
 function toggleTopics(){
     let section = document.getElementById("topicsSection");
     section.style.display = (section.style.display === "none") ? "block" : "none";
 }
 
 function selectTopic(element, topic){
-
     document.querySelectorAll(".topic-item").forEach(item=>{
         item.classList.remove("topic-selected");
         if (!item.classList.contains("topic-submitted")) {
@@ -172,10 +171,9 @@ function selectTopic(element, topic){
     element.classList.add("topic-selected", "topic-disabled");
     element.disabled = true;
     document.getElementById("topicInput").value = topic;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* CONFIRM */
 function confirmSubmit(event){
     if (isFinalSubmit) {
         return true;
@@ -206,8 +204,7 @@ function closeConfirm(){
     }
 }
 
-/* TIMER */
-var deadline = new Date("February 23, 2026 23:59:59").getTime();
+var deadline = new Date({{ selected_subject.deadline|tojson }}).getTime();
 
 setInterval(function () {
     var now = new Date().getTime();
@@ -223,22 +220,18 @@ setInterval(function () {
     var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
     var seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-    document.getElementById("timer").innerHTML =
-        days + "d : " + hours + "h : " +
-        minutes + "m : " + seconds + "s";
+    document.getElementById("timer").innerHTML = days + "d : " + hours + "h : " + minutes + "m : " + seconds + "s";
 }, 1000);
-
 </script>
 
 </head>
 <body class="p-3">
 <div class="container">
 
-<!-- HEADER (UNCHANGED) -->
 <div class="header-box shadow mb-4">
     <div class="row align-items-center text-center">
         <div class="col-12 col-md-3 text-md-start mb-2">
-            <img src="{{ url_for('static', filename='images/left_logo.png') }}" width="160">
+            <img src="{{ url_for('static', filename='images/left_logo.png') }}" width="160" alt="University Logo">
         </div>
         <div class="col-12 col-md-6">
             <h5 class="fw-bold">Sandip University, Nashik (MS), India</h5>
@@ -249,13 +242,22 @@ setInterval(function () {
     </div>
     <hr>
     <div class="text-center">
-        <h6>Program: B.Tech CSE | Sem IV <br> Div A</h6>
-        <h6>Subject: Microcontroller & Interfacing</h6>
-        <h6>Faculty: Samiksha Gawali Mam</h6>
+        <h6>Program: B.Tech CSE | Sem IV | Div A</h6>
+        <h6>Subject: {{ selected_subject.name }}</h6>
+        <h6>Faculty: {{ selected_subject.faculty }}</h6>
     </div>
 </div>
 
 <h4 class="text-center mb-3 text-white">Project Topic Registration</h4>
+
+<div class="subject-switch text-center mb-4">
+    {% for subject in subjects %}
+    <a href="{{ url_for('index', subject=subject.key) }}"
+       class="btn {% if subject.key == selected_subject_key %}btn-dark{% else %}btn-outline-light{% endif %} me-2 mb-2">
+        {{ subject.name }}
+    </a>
+    {% endfor %}
+</div>
 
 {% if message %}
 <div class="alert alert-warning shadow-sm mb-3" role="alert">
@@ -263,24 +265,21 @@ setInterval(function () {
 </div>
 {% endif %}
 
-<!-- INSTRUCTIONS -->
 <div class="instructions-box">
-    <h6>📌 Instructions</h6>
+    <h6>Instructions</h6>
     <ul>
         <li>You can select 1 to 4 members.</li>
-        <li>Duplicate or similar topics not allowed.</li>
-        <li>A student cannot register in more than one group.</li>
+        <li>Duplicate or similar topics are not allowed in the same subject.</li>
+        <li>A student cannot register in more than one group in the same subject.</li>
     </ul>
 </div>
 
-<!-- RELATED TOPICS BUTTON -->
 <div class="text-center mb-3">
-    <button class="btn btn-dark px-4" onclick="toggleTopics()">📚 Related Topics</button>
+    <button type="button" class="btn btn-dark px-4" onclick="toggleTopics()">Related Topics</button>
 </div>
 
-<!-- TOPICS LIST -->
 <div id="topicsSection" style="display:none;" class="glass-card mb-4">
-    <h5 class="text-center mb-3">All Topics</h5>
+    <h5 class="text-center mb-3">{{ selected_subject.name }} Topics</h5>
     <div class="row">
         {% for topic in all_topics %}
         {% set topic_key = topic|lower|replace(' ', '') %}
@@ -301,9 +300,9 @@ setInterval(function () {
     </div>
 </div>
 
-<!-- FORM -->
 <div class="glass-card mb-4">
-<form method="POST" id="groupForm" onsubmit="confirmSubmit(event)">
+<form method="POST" id="groupForm" action="{{ url_for('index', subject=selected_subject_key) }}" onsubmit="confirmSubmit(event)">
+<input type="hidden" name="subject" value="{{ selected_subject_key }}">
 
 <h6>Number of Members</h6>
 <div class="mb-3">
@@ -336,7 +335,6 @@ setInterval(function () {
 </form>
 </div>
 
-<!-- CONFIRM SUBMIT MODAL -->
 <div id="confirmModal" class="confirm-modal" onclick="if(event.target===this){closeConfirm()}">
     <div class="confirm-modal-card">
         <h5 class="mb-3">Confirm Submission</h5>
@@ -348,14 +346,12 @@ setInterval(function () {
     </div>
 </div>
 
-<!-- TIMER -->
 <div class="timer-section mb-4">
 FORM CLOSES IN: <span id="timer"></span>
 </div>
 
-<!-- REGISTERED GROUPS (UNCHANGED) -->
 <div class="glass-card">
-<h5 class="mb-3">Registered Groups ({{ groups|length }}/26)</h5>
+<h5 class="mb-3">Registered Groups - {{ selected_subject.name }} ({{ groups|length }}/{{ max_groups_per_subject }})</h5>
 <table class="table table-bordered bg-white">
 <thead class="table-light">
 <tr>

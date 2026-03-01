@@ -7,7 +7,6 @@
 </head>
 
 <body class="p-4 bg-light">
-
 <div class="container">
 
 <h3 class="mb-4">Edit Group #{{ group.id }}</h3>
@@ -16,67 +15,65 @@
 
 <form method="POST">
 
+<h5>Subject</h5>
+<select name="subject" class="form-select mb-3" required>
+    {% for subject in subjects %}
+    <option value="{{ subject.key }}" {% if subject.key == selected_subject_key %}selected{% endif %}>
+        {{ subject.name }}
+    </option>
+    {% endfor %}
+</select>
+
 <h5>Topic</h5>
-<input type="text" name="topic" class="form-control mb-3"
-       value="{{ group.topic }}" required>
+<input type="text" name="topic" class="form-control mb-3" value="{{ group.topic }}" required>
 
 <h6>Member 1</h6>
 <div class="row mb-3">
     <div class="col-md-6">
-        <input type="text" name="m1_name" class="form-control"
-               value="{{ group.m1_name }}" required>
+        <input type="text" name="m1_name" class="form-control" value="{{ group.m1_name or '' }}">
     </div>
     <div class="col-md-6">
-        <input type="text" name="m1_prn" class="form-control"
-               value="{{ group.m1_prn }}" required>
+        <input type="text" name="m1_prn" class="form-control" value="{{ group.m1_prn or '' }}">
     </div>
 </div>
 
 <h6>Member 2</h6>
 <div class="row mb-3">
     <div class="col-md-6">
-        <input type="text" name="m2_name" class="form-control"
-               value="{{ group.m2_name }}" required>
+        <input type="text" name="m2_name" class="form-control" value="{{ group.m2_name or '' }}">
     </div>
     <div class="col-md-6">
-        <input type="text" name="m2_prn" class="form-control"
-               value="{{ group.m2_prn }}" required>
+        <input type="text" name="m2_prn" class="form-control" value="{{ group.m2_prn or '' }}">
     </div>
 </div>
 
 <h6>Member 3</h6>
 <div class="row mb-3">
     <div class="col-md-6">
-        <input type="text" name="m3_name" class="form-control"
-               value="{{ group.m3_name }}" required>
+        <input type="text" name="m3_name" class="form-control" value="{{ group.m3_name or '' }}">
     </div>
     <div class="col-md-6">
-        <input type="text" name="m3_prn" class="form-control"
-               value="{{ group.m3_prn }}" required>
+        <input type="text" name="m3_prn" class="form-control" value="{{ group.m3_prn or '' }}">
     </div>
 </div>
 
 <h6>Member 4</h6>
 <div class="row mb-3">
     <div class="col-md-6">
-        <input type="text" name="m4_name" class="form-control"
-               value="{{ group.m4_name }}" required>
+        <input type="text" name="m4_name" class="form-control" value="{{ group.m4_name or '' }}">
     </div>
     <div class="col-md-6">
-        <input type="text" name="m4_prn" class="form-control"
-               value="{{ group.m4_prn }}" required>
+        <input type="text" name="m4_prn" class="form-control" value="{{ group.m4_prn or '' }}">
     </div>
 </div>
 
-<button type="submit" class="btn btn-success w-100">
-    Update Group
-</button>
+<button type="submit" class="btn btn-success w-100 mb-2">Update Group</button>
+<a href="{{ url_for('admin', subject=selected_subject_key) }}" class="btn btn-outline-secondary w-100">Back to Admin</a>
 
 </form>
 
 </div>
 
 </div>
-
 </body>
 </html>
