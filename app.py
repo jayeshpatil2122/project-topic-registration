@@ -39,7 +39,7 @@ SUBJECTS = [
         "key": "microcontroller-interfacing",
         "name": "Microcontroller & Interfacing",
         "faculty": "Samiksha Gawali Mam",
-        "deadline": "March 31, 2026 23:59:59",
+        "deadline": "March 5, 2026 23:59:59",
         "topics": [
             "Smart Irrigation System",
             "Temperature Monitoring System",
@@ -59,8 +59,8 @@ SUBJECTS = [
     {
         "key": "digital-electronics",
         "name": "Digital Electronics",
-        "faculty": "Samiksha Gawali Mam",
-        "deadline": "March 31, 2026 23:59:59",
+        "faculty": "Ms. Shital Adasare Mam",
+        "deadline": "March 5, 2026 23:59:59",
         "topics": [
             "Digital Parking Lot Occupancy Counter ",
             "Digital Door Lock System Using Logic Gates ",
