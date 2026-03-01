@@ -62,7 +62,7 @@ SUBJECTS = [
         "faculty": "Samiksha Gawali Mam",
         "deadline": "March 31, 2026 23:59:59",
         "topics": [
-            "Topic-Digital Parking Lot Occupancy Counter  🔁",
+            "Topic-Digital Parking Lot Occupancy Counter 🔁",
             "Digital Door Lock System Using Logic Gates 🔐",
             "Electronic Voting Machine Using Digital Logic 🗳️",
             "Binary Calculator Using Combinational Circuits ➕",
