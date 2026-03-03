@@ -378,10 +378,60 @@ def admin():
     )
 
 
-@app.route("/admin/logout", methods=["POST"])
+@app.route("/admin/logout", methods=["GET", "POST"])
 def admin_logout():
     session.pop("is_admin", None)
     return redirect(url_for("admin"))
+
+
+# ===============================
+# ADMIN CRUD
+# ===============================
+@app.route("/admin/edit/<int:group_id>", methods=["GET", "POST"])
+def edit_group(group_id):
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
+
+    group = Group.query.get_or_404(group_id)
+
+    if request.method == "POST":
+        selected_subject_key = normalize_subject_key(request.form.get("subject") or group.subject)
+        topic = request.form.get("topic", "").strip()
+
+        if topic:
+            group.topic = topic
+        group.subject = selected_subject_key
+
+        for i in range(1, 5):
+            name = request.form.get(f"m{i}_name", "").strip()
+            prn = request.form.get(f"m{i}_prn", "").strip()
+            setattr(group, f"m{i}_name", name or None)
+            setattr(group, f"m{i}_prn", prn or None)
+
+        db.session.commit()
+        return redirect(url_for("admin", subject=selected_subject_key))
+
+    selected_subject_key = normalize_subject_key(request.args.get("subject") or group.subject)
+    return render_template(
+        "edit_group.html",
+        group=group,
+        subjects=SUBJECTS,
+        selected_subject_key=selected_subject_key,
+    )
+
+
+@app.route("/admin/delete/<int:group_id>", methods=["POST"])
+def delete_group(group_id):
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
+
+    group = Group.query.get_or_404(group_id)
+    selected_subject_key = normalize_subject_key(request.form.get("subject") or group.subject)
+    db.session.delete(group)
+    db.session.commit()
+    return redirect(url_for("admin", subject=selected_subject_key))
 
 
 # ===============================
