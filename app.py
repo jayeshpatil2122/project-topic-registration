@@ -382,96 +382,122 @@ def admin_logout():
 
 
 # ===============================
-# EDIT GROUP
+# DOWNLOAD EXCEL (CIA FORMAT STYLE)
 # ===============================
-@app.route("/edit/<int:group_id>", methods=["GET", "POST"])
-def edit_group(group_id):
-    admin_redirect = admin_required_redirect()
-    if admin_redirect:
-        return admin_redirect
-
-    group = Group.query.get_or_404(group_id)
-
-    if request.method == "POST":
-        group.subject = normalize_subject_key(request.form.get("subject", group.subject))
-        group.topic = request.form.get("topic", "").strip()
-        group.m1_name = request.form.get("m1_name", "").strip()
-        group.m1_prn = request.form.get("m1_prn", "").strip()
-        group.m2_name = request.form.get("m2_name", "").strip()
-        group.m2_prn = request.form.get("m2_prn", "").strip()
-        group.m3_name = request.form.get("m3_name", "").strip()
-        group.m3_prn = request.form.get("m3_prn", "").strip()
-        group.m4_name = request.form.get("m4_name", "").strip()
-        group.m4_prn = request.form.get("m4_prn", "").strip()
-
-        db.session.commit()
-        return redirect(url_for("admin", subject=group.subject))
-
-    return render_template(
-        "edit_group.html",
-        group=group,
-        subjects=SUBJECTS,
-        selected_subject_key=normalize_subject_key(group.subject),
-    )
-
-
-# ===============================
-# DELETE GROUP
-# ===============================
-@app.route("/delete/<int:group_id>", methods=["POST"])
-def delete_group(group_id):
-    admin_redirect = admin_required_redirect()
-    if admin_redirect:
-        return admin_redirect
-
-    group = Group.query.get_or_404(group_id)
-    redirect_subject = normalize_subject_key(request.form.get("subject", group.subject))
-    db.session.delete(group)
-    db.session.commit()
-
-    return redirect(url_for("admin", subject=redirect_subject))
-
-
-# ===============================
-# DOWNLOAD EXCEL
-# ===============================
-@app.route("/download_excel")
+@app.route('/download_excel')
 def download_excel():
-    admin_redirect = admin_required_redirect()
-    if admin_redirect:
-        return admin_redirect
 
-    selected_subject_key = get_selected_subject_key()
-    selected_subject = SUBJECTS_BY_KEY[selected_subject_key]
-    groups = get_groups_for_subject(selected_subject_key)
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, Border, Side
+    from openpyxl.utils import get_column_letter
 
-    data = []
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Mini Project List"
+
+    # ===============================
+    # HEADER SECTION
+    # ===============================
+
+    ws.merge_cells('A1:D1')
+    ws['A1'] = "Sandip University, Nashik (MS), India"
+    ws['A1'].alignment = Alignment(horizontal="center")
+    ws['A1'].font = Font(size=14, bold=True)
+
+    ws.merge_cells('A2:D2')
+    ws['A2'] = "Program: B.Tech CSE | Sem IV | Div A"
+    ws['A2'].alignment = Alignment(horizontal="center")
+
+    ws.merge_cells('A3:D3')
+    ws['A3'] = "Subject: Microcontroller & Interfacing"
+    ws['A3'].alignment = Alignment(horizontal="center")
+
+    ws.merge_cells('A4:D4')
+    ws['A4'] = "Mini Project List"
+    ws['A4'].alignment = Alignment(horizontal="center")
+    ws['A4'].font = Font(size=13, bold=True)
+
+    # ===============================
+    # TABLE HEADER
+    # ===============================
+
+    ws['A6'] = "Sr.No"
+    ws['B6'] = "PRN No"
+    ws['C6'] = "Project Group Members"
+    ws['D6'] = "Project Title"
+
+    for col in range(1,5):
+        ws.cell(row=6, column=col).font = Font(bold=True)
+
+    # ===============================
+    # FETCH DATA
+    # ===============================
+
+    groups = Group.query.all()
+    row = 7
+    sr = 1
 
     for g in groups:
-        data.append(
-            [
-                g.topic or "",
-                f"{g.m1_name or ''}\n{g.m1_prn or ''}",
-                f"{g.m2_name or ''}\n{g.m2_prn or ''}",
-                f"{g.m3_name or ''}\n{g.m3_prn or ''}",
-                f"{g.m4_name or ''}\n{g.m4_prn or ''}",
-            ]
-        )
 
-    df = pd.DataFrame(
-        data,
-        columns=["Topic", "Member 1", "Member 2", "Member 3", "Member 4"],
+      ws[f"A{row}"] = sr
+
+    # Always 4 members FIXED STRUCTURE
+    members = [
+        (g.m1_name, g.m1_prn),
+        (g.m2_name, g.m2_prn),
+        (g.m3_name, g.m3_prn),
+        (g.m4_name, g.m4_prn)
+    ]
+
+    prn_text = ""
+    name_text = ""
+
+    for i in range(4):
+
+        name = members[i][0] or ""
+        prn = members[i][1] or ""
+
+        prn_text += f"{i+1}) {prn}\n"
+        name_text += f"{name}\n"
+
+    ws[f"B{row}"] = prn_text.strip()
+    ws[f"C{row}"] = name_text.strip()
+    ws[f"D{row}"] = g.topic or ""
+
+    ws[f"B{row}"].alignment = Alignment(wrap_text=True)
+    ws[f"C{row}"].alignment = Alignment(wrap_text=True)
+
+    row += 1
+    sr += 1
+
+    # ===============================
+    # COLUMN WIDTH
+    # ===============================
+
+    ws.column_dimensions['A'].width = 8
+    ws.column_dimensions['B'].width = 18
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 30
+
+    # ===============================
+    # BORDER
+    # ===============================
+
+    thin = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
     )
 
-    safe_subject = selected_subject_key.replace("-", "_")
-    file_path = f"groups_{safe_subject}.xlsx"
-    df.to_excel(file_path, index=False, engine="openpyxl")
+    for r in range(6, row):
+        for c in range(1,5):
+            ws.cell(row=r, column=c).border = thin
 
-    return send_file(
-        file_path,
-        as_attachment=True,
-        download_name=f"{selected_subject['name']} Groups.xlsx",
-    )
+    file_path = "groups.xlsx"
+    wb.save(file_path)
+
+    return send_file(file_path, as_attachment=True)
 
 
 # ===============================
