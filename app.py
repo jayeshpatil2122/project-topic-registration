@@ -2,6 +2,7 @@ from reportlab.lib.pagesizes import A4
 from flask import Flask, render_template, request, redirect, send_file, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
+from copy import copy
 import pandas as pd
 from reportlab.platypus import SimpleDocTemplate, Table
 import os
@@ -439,118 +440,180 @@ def delete_group(group_id):
 # ===============================
 @app.route('/download_excel')
 def download_excel():
+    admin_redirect = admin_required_redirect()
+    if admin_redirect:
+        return admin_redirect
 
-    from openpyxl import Workbook
-    from openpyxl.styles import Alignment, Font, Border, Side
-    from openpyxl.utils import get_column_letter
+    from openpyxl import Workbook, load_workbook
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Mini Project List"
+    selected_subject_key = get_selected_subject_key()
+    selected_subject = SUBJECTS_BY_KEY[selected_subject_key]
+    groups = get_groups_for_subject(selected_subject_key)
 
-    # ===============================
-    # HEADER SECTION
-    # ===============================
-
-    ws.merge_cells('A1:D1')
-    ws['A1'] = "Sandip University, Nashik (MS), India"
-    ws['A1'].alignment = Alignment(horizontal="center")
-    ws['A1'].font = Font(size=14, bold=True)
-
-    ws.merge_cells('A2:D2')
-    ws['A2'] = "Program: B.Tech CSE | Sem IV | Div A"
-    ws['A2'].alignment = Alignment(horizontal="center")
-
-    ws.merge_cells('A3:D3')
-    ws['A3'] = "Subject: Microcontroller & Interfacing"
-    ws['A3'].alignment = Alignment(horizontal="center")
-
-    ws.merge_cells('A4:D4')
-    ws['A4'] = "Mini Project List"
-    ws['A4'].alignment = Alignment(horizontal="center")
-    ws['A4'].font = Font(size=13, bold=True)
-
-    # ===============================
-    # TABLE HEADER
-    # ===============================
-
-    ws['A6'] = "Sr.No"
-    ws['B6'] = "PRN No"
-    ws['C6'] = "Project Group Members"
-    ws['D6'] = "Project Title"
-
-    for col in range(1,5):
-        ws.cell(row=6, column=col).font = Font(bold=True)
-
-    # ===============================
-    # FETCH DATA
-    # ===============================
-
-    groups = Group.query.all()
-    row = 7
-    sr = 1
-
-    for g in groups:
-
-      ws[f"A{row}"] = sr
-
-    # Always 4 members FIXED STRUCTURE
-    members = [
-        (g.m1_name, g.m1_prn),
-        (g.m2_name, g.m2_prn),
-        (g.m3_name, g.m3_prn),
-        (g.m4_name, g.m4_prn)
+    template_candidates = [
+        os.environ.get("EXCEL_TEMPLATE_PATH"),
+        os.path.join(app.root_path, "Microcontroller Interface CIA 3 Updated (1).xlsx"),
+        r"C:\Users\patil\OneDrive\Documents\Microcontroller Interface CIA 3 Updated (1).xlsx",
     ]
+    template_path = next((path for path in template_candidates if path and os.path.exists(path)), None)
 
-    prn_text = ""
-    name_text = ""
+    def clone_row_style(sheet, src_row, dst_row, max_col=4):
+        src_dim = sheet.row_dimensions[src_row]
+        if src_dim.height is not None:
+            sheet.row_dimensions[dst_row].height = src_dim.height
+        for col in range(1, max_col + 1):
+            src = sheet.cell(src_row, col)
+            dst = sheet.cell(dst_row, col)
+            if src.has_style:
+                dst._style = copy(src._style)
 
-    for i in range(4):
+    def next_serial_number(sheet):
+        serials = []
+        for r in range(5, sheet.max_row + 1):
+            value = sheet.cell(r, 1).value
+            if value is None or value == "":
+                continue
+            try:
+                serials.append(int(str(value).strip()))
+            except ValueError:
+                continue
+        return (max(serials) + 1) if serials else 1
 
-        name = members[i][0] or ""
-        prn = members[i][1] or ""
+    def append_groups_like_template(sheet, start_row, groups_to_write, start_serial):
+        row = start_row
+        sr_no = start_serial
+        style_rows = [5, 6, 7, 8] if sheet.max_row >= 8 else []
 
-        prn_text += f"{i+1}) {prn}\n"
-        name_text += f"{name}\n"
+        for g in groups_to_write:
+            members = []
+            for name, prn in [
+                (g.m1_name, g.m1_prn),
+                (g.m2_name, g.m2_prn),
+                (g.m3_name, g.m3_prn),
+                (g.m4_name, g.m4_prn),
+            ]:
+                if name or prn:
+                    members.append((name or "", prn or ""))
 
-    ws[f"B{row}"] = prn_text.strip()
-    ws[f"C{row}"] = name_text.strip()
-    ws[f"D{row}"] = g.topic or ""
+            if not members:
+                members = [("", "")]
 
-    ws[f"B{row}"].alignment = Alignment(wrap_text=True)
-    ws[f"C{row}"].alignment = Alignment(wrap_text=True)
+            for idx in range(len(members)):
+                if style_rows:
+                    clone_row_style(sheet, style_rows[min(idx, len(style_rows) - 1)], row + idx)
 
-    row += 1
-    sr += 1
+            if len(members) > 1:
+                sheet.merge_cells(start_row=row, start_column=1, end_row=row + len(members) - 1, end_column=1)
+                sheet.merge_cells(start_row=row, start_column=4, end_row=row + len(members) - 1, end_column=4)
 
-    # ===============================
-    # COLUMN WIDTH
-    # ===============================
+            sheet.cell(row=row, column=1).value = sr_no
+            sheet.cell(row=row, column=4).value = g.topic or ""
 
-    ws.column_dimensions['A'].width = 8
-    ws.column_dimensions['B'].width = 18
-    ws.column_dimensions['C'].width = 25
-    ws.column_dimensions['D'].width = 30
+            for idx, (name, prn) in enumerate(members):
+                current_row = row + idx
+                sheet.cell(row=current_row, column=2).value = str(prn) if prn else ""
+                sheet.cell(row=current_row, column=3).value = name
 
-    # ===============================
-    # BORDER
-    # ===============================
+            row += len(members)
+            sr_no += 1
 
-    thin = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
+    if template_path:
+        wb = load_workbook(template_path)
+        ws = wb.active
 
-    for r in range(6, row):
-        for c in range(1,5):
-            ws.cell(row=r, column=c).border = thin
+        if ws["A3"].value:
+            ws["A3"] = f"CIA 3 {selected_subject['name']} list"
 
-    file_path = "groups.xlsx"
+        start_row = ws.max_row + 1
+        append_groups_like_template(
+            ws,
+            start_row,
+            groups,
+            start_serial=next_serial_number(ws),
+        )
+    else:
+        from openpyxl.styles import Alignment, Font, Border, Side
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Mini Project List"
+
+        ws.merge_cells('A1:D1')
+        ws['A1'] = "Sandip University, Nashik (MS), India"
+        ws['A1'].alignment = Alignment(horizontal="center")
+        ws['A1'].font = Font(size=14, bold=True)
+
+        ws.merge_cells('A2:D2')
+        ws['A2'] = "Program: B.Tech CSE | Sem IV | Div A"
+        ws['A2'].alignment = Alignment(horizontal="center")
+
+        ws.merge_cells('A3:D3')
+        ws['A3'] = f"Subject: {selected_subject['name']}"
+        ws['A3'].alignment = Alignment(horizontal="center")
+
+        ws.merge_cells('A4:D4')
+        ws['A4'] = "Mini Project List"
+        ws['A4'].alignment = Alignment(horizontal="center")
+        ws['A4'].font = Font(size=13, bold=True)
+
+        ws['A6'] = "Sr.No"
+        ws['B6'] = "PRN No"
+        ws['C6'] = "Project Group Members"
+        ws['D6'] = "Project Title"
+
+        for col in range(1, 5):
+            ws.cell(row=6, column=col).font = Font(bold=True)
+
+        row = 7
+        sr = 1
+        for g in groups:
+            members = []
+            for name, prn in [
+                (g.m1_name, g.m1_prn),
+                (g.m2_name, g.m2_prn),
+                (g.m3_name, g.m3_prn),
+                (g.m4_name, g.m4_prn),
+            ]:
+                if name or prn:
+                    members.append((name or "", prn or ""))
+
+            if not members:
+                members = [("", "")]
+
+            ws.cell(row=row, column=1).value = sr
+            ws.cell(row=row, column=4).value = g.topic or ""
+
+            for idx, (name, prn) in enumerate(members):
+                current_row = row + idx
+                ws.cell(row=current_row, column=2).value = str(prn) if prn else ""
+                ws.cell(row=current_row, column=3).value = name
+
+            row += len(members)
+            sr += 1
+
+        ws.column_dimensions['A'].width = 8
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 30
+
+        thin = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        for r in range(6, row):
+            for c in range(1, 5):
+                ws.cell(row=r, column=c).border = thin
+
+    safe_subject = selected_subject_key.replace("-", "_")
+    file_path = f"groups_{safe_subject}.xlsx"
     wb.save(file_path)
-
-    return send_file(file_path, as_attachment=True)
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=f"{selected_subject['name']} Groups.xlsx",
+    )
 
 
 # ===============================
