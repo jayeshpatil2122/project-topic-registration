@@ -27,7 +27,10 @@ else:
     print("Using SQLite database")
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "group-project-dev-secret")
+
+# If SECRET_KEY is missing or blank, Flask sessions break and admin login returns 500.
+secret_key = (os.environ.get("SECRET_KEY") or "").strip()
+app.config["SECRET_KEY"] = secret_key or "group-project-dev-secret"
 db = SQLAlchemy(app)
 
 ADMIN_PASSWORD = "1353"
