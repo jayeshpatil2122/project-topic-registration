@@ -43,7 +43,7 @@ SUBJECTS = [
         "key": "microcontroller-interfacing",
         "name": "Microcontroller & Interfacing",
         "faculty": "Samiksha Gawali Mam",
-        "deadline": "March 5, 2026 23:59:59",
+        "deadline": "March 3, 2026 23:59:59",
         "topics": [
             "Smart Irrigation System",
             "Temperature Monitoring System",
@@ -64,7 +64,7 @@ SUBJECTS = [
         "key": "digital-electronics",
         "name": "Digital Electronics",
         "faculty": "Ms. Shital Adasare Mam",
-        "deadline": "March 5, 2026 23:59:59",
+        "deadline": "March 7, 2026 23:59:59",
         "topics": [
             "Digital Parking Lot Occupancy Counter ",
             "Digital Door Lock System Using Logic Gates ",
@@ -105,6 +105,13 @@ class Group(db.Model):
     m3_prn = db.Column(db.String(100))
     m4_name = db.Column(db.String(100))
     m4_prn = db.Column(db.String(100))
+
+
+class SubjectAccess(db.Model):
+    __tablename__ = "subject_access"
+
+    subject = db.Column(db.String(100), primary_key=True)
+    is_open = db.Column(db.Boolean, nullable=False, default=True)
 
 
 def ensure_subject_column():
@@ -185,10 +192,24 @@ def ensure_topic_is_not_unique():
             connection.execute(text(f"ALTER TABLE groups DROP CONSTRAINT {constraint_name}"))
 
 
+def ensure_subject_access_rows():
+    existing_subjects = {row.subject for row in SubjectAccess.query.all()}
+    missing_subjects = [
+        subject["key"] for subject in SUBJECTS if subject["key"] not in existing_subjects
+    ]
+    if not missing_subjects:
+        return
+
+    for subject_key in missing_subjects:
+        db.session.add(SubjectAccess(subject=subject_key, is_open=True))
+    db.session.commit()
+
+
 with app.app_context():
     db.create_all()
     ensure_subject_column()
     ensure_topic_is_not_unique()
+    ensure_subject_access_rows()
 
 
 # ===============================
@@ -232,6 +253,13 @@ def get_groups_for_subject(subject_key):
     return Group.query.filter_by(subject=subject_key).order_by(Group.id.asc()).all()
 
 
+def get_subject_access_map():
+    subject_access_map = {subject["key"]: True for subject in SUBJECTS}
+    for row in SubjectAccess.query.all():
+        subject_access_map[row.subject] = bool(row.is_open)
+    return subject_access_map
+
+
 def admin_required_redirect():
     if not session.get("is_admin"):
         return redirect(url_for("admin"))
@@ -248,7 +276,10 @@ def index():
 
     selected_subject_key = get_selected_subject_key()
     selected_subject = SUBJECTS_BY_KEY[selected_subject_key]
-    existing_groups = get_groups_for_subject(selected_subject_key)
+    all_groups_for_subject = get_groups_for_subject(selected_subject_key)
+    subject_access_map = get_subject_access_map()
+    selected_subject_open = subject_access_map.get(selected_subject_key, True)
+    existing_groups = all_groups_for_subject if selected_subject_open else []
     all_topics = selected_subject["topics"]
     submitted_topics = {clean_text(g.topic) for g in existing_groups if g.topic}
 
@@ -264,9 +295,16 @@ def index():
             selected_subject=selected_subject,
             selected_subject_key=selected_subject_key,
             max_groups_per_subject=MAX_GROUPS_PER_SUBJECT,
+            selected_subject_open=selected_subject_open,
+            subject_access_map=subject_access_map,
         )
 
     if request.method == "POST":
+        if not selected_subject_open:
+            popup = "subject_closed"
+            message = "Closed: Data is not visible because form is closed."
+            return render_index()
+
         if Group.query.filter_by(subject=selected_subject_key).count() >= MAX_GROUPS_PER_SUBJECT:
             popup = "max_groups"
             message = f"Maximum {MAX_GROUPS_PER_SUBJECT} groups allowed for this subject."
@@ -367,8 +405,24 @@ def admin():
     if not session.get("is_admin"):
         return render_template("admin_login.html")
 
+    if request.method == "POST" and request.form.get("action") == "set_subject_access":
+        subject_key = normalize_subject_key(request.form.get("subject"))
+        is_open = request.form.get("is_open") == "1"
+
+        subject_access = db.session.get(SubjectAccess, subject_key)
+        if subject_access is None:
+            subject_access = SubjectAccess(subject=subject_key, is_open=is_open)
+            db.session.add(subject_access)
+        else:
+            subject_access.is_open = is_open
+        db.session.commit()
+
+        return redirect(url_for("admin", subject=subject_key))
+
     selected_subject_key = get_selected_subject_key()
     groups = get_groups_for_subject(selected_subject_key)
+    subject_access_map = get_subject_access_map()
+    subject_is_open = subject_access_map.get(selected_subject_key, True)
 
     return render_template(
         "admin.html",
@@ -376,6 +430,8 @@ def admin():
         subjects=SUBJECTS,
         selected_subject_key=selected_subject_key,
         selected_subject=SUBJECTS_BY_KEY[selected_subject_key],
+        subject_access_map=subject_access_map,
+        subject_is_open=subject_is_open,
     )
 
 

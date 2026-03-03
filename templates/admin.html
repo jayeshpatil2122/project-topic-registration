@@ -18,6 +18,30 @@
             padding: 25px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
+
+        .access-toggle-btn {
+            border: none;
+            border-radius: 999px;
+            padding: 8px 16px;
+            min-width: 105px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            color: #fff;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .access-toggle-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .access-toggle-btn.close {
+            background: linear-gradient(90deg, #d32f2f, #b71c1c);
+        }
+
+        .access-toggle-btn.open {
+            background: linear-gradient(90deg, #2e7d32, #1b5e20);
+        }
     </style>
 </head>
 
@@ -40,7 +64,7 @@
                 <select class="form-select" id="subject" name="subject" onchange="this.form.submit()">
                     {% for subject in subjects %}
                     <option value="{{ subject.key }}" {% if subject.key == selected_subject_key %}selected{% endif %}>
-                        {{ subject.name }}
+                        {{ subject.name }} {% if subject_access_map.get(subject.key, True) %}(ON){% else %}(OFF){% endif %}
                     </option>
                     {% endfor %}
                 </select>
@@ -49,6 +73,32 @@
                 <span class="badge text-bg-dark">{{ groups|length }} Groups</span>
             </div>
         </form>
+
+        <div class="row g-2 align-items-center mb-4">
+            <div class="col-12 col-md-6">
+                <strong>Student Access for {{ selected_subject.name }}</strong>
+            </div>
+            <div class="col-12 col-md-3">
+                {% if subject_is_open %}
+                <span class="badge text-bg-success">ON</span>
+                {% else %}
+                <span class="badge text-bg-danger">OFF</span>
+                {% endif %}
+            </div>
+            <div class="col-12 col-md-3 text-md-end">
+                <form method="POST" action="{{ url_for('admin', subject=selected_subject_key) }}">
+                    <input type="hidden" name="action" value="set_subject_access">
+                    <input type="hidden" name="subject" value="{{ selected_subject_key }}">
+                    {% if subject_is_open %}
+                    <input type="hidden" name="is_open" value="0">
+                    <button type="submit" class="access-toggle-btn close">Close</button>
+                    {% else %}
+                    <input type="hidden" name="is_open" value="1">
+                    <button type="submit" class="access-toggle-btn open">Open</button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
 
         <div class="text-center mb-4">
             <a href="{{ url_for('download_excel', subject=selected_subject_key) }}" class="btn btn-success me-2 mb-2">
